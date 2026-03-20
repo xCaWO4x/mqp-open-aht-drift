@@ -1,0 +1,22 @@
+# Local dev notes
+CHANGELOG.md
+TODO.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Results / artifacts
+results/
+runs/
+wandb/
+
+# Environment
+.env
+*.egg
+
+# OS
+.DS_Store
