@@ -10,6 +10,8 @@ After each update, x is projected back onto the K-simplex via Euclidean
 simplex projection (Duchi et al., 2008).
 """
 
+from typing import List
+
 import numpy as np
 
 
@@ -101,7 +103,7 @@ class OUProcess:
         self.x = project_onto_simplex(self.mu + noise)
         return self.state
 
-    def sample_composition(self, n_agents: int) -> list[int]:
+    def sample_composition(self, n_agents: int) -> List[int]:
         """Sample a team of n_agents by drawing types i.i.d. from current state.
 
         Returns a list of integer type indices in [0, K).
