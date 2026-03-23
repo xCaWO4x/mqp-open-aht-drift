@@ -95,13 +95,13 @@ print('Wolfpack OK')
 open-aht-drift/
 ├── envs/
 │   ├── drift_wrapper.py        # OU drift process wrapper — core contribution
-│   └── env_utils.py            # helpers for seeding, resetting, obs formatting
+│   └── env_utils.py            # PREPROCESS (C.1) + LBF/Wolfpack obs adapters ✓
 ├── agents/
-│   ├── gpl/                    # GPL model code
-│   │   ├── type_inference.py   # LSTM-based type embedding (stub)
-│   │   ├── agent_model.py      # RFM-based teammate action prediction (stub)
-│   │   ├── joint_action_value.py  # GNN joint Q-value model (stub)
-│   │   └── gpl_agent.py        # top-level GPL agent (stub)
+│   ├── gpl/                    # GPL model code (fully implemented)
+│   │   ├── type_inference.py   # LSTM-based type embedding (§4.2, Eq. 7)
+│   │   ├── agent_model.py      # RFM-based teammate action prediction (§4.4, Eqs. 11-13)
+│   │   ├── joint_action_value.py  # Coordination graph Q-value (§4.3, Eqs. 8-10)
+│   │   └── gpl_agent.py        # top-level GPL agent (Algorithms 2-5)
 │   └── baselines/
 │       └── random_agent.py     # sanity check baseline
 ├── drift/
@@ -121,9 +121,10 @@ open-aht-drift/
 │   ├── gpl_wolfpack.yaml       # hyperparameters for GPL on Wolfpack
 │   └── drift_sweep.yaml        # (sigma, theta) grid for pilot experiment
 ├── tests/
-│   ├── test_ou_process.py      # unit tests for OUProcess ✓
-│   ├── test_drift_wrapper.py   # unit tests for DriftWrapper ✓
-│   └── test_gpl_forward.py     # smoke tests for GPL stubs ✓
+│   ├── test_ou_process.py      # unit tests for OUProcess ✓ (11 tests)
+│   ├── test_drift_wrapper.py   # unit tests for DriftWrapper ✓ (6 tests)
+│   ├── test_gpl_forward.py     # GPL forward pass + training tests ✓ (37 tests)
+│   └── test_preprocess.py      # PREPROCESS + hidden state management ✓ (12 tests)
 ├── requirements.txt
 └── setup.py
 ```
@@ -185,18 +186,23 @@ Minimal baseline that uniformly samples from the action space, ignoring
 observations. Used as a sanity-check placeholder in the pilot experiment
 before GPL is implemented.
 
-### `agents/gpl/` — GPL stubs
+### `agents/gpl/` — GPL (fully implemented)
 
-Class skeletons (docstrings + signatures, no implementation yet).
-Each file contains a `# TODO` comment pointing to the relevant section of
-Rahman et al. 2023 ([arXiv:2210.05448](https://arxiv.org/abs/2210.05448)).
+Complete implementation of Graph-based Policy Learning aligned with
+Rahman et al. 2023 ([arXiv:2210.05448](https://arxiv.org/abs/2210.05448)),
+Appendix A (Algorithms 2-5) and C.1 (PREPROCESS).
 
 | Class | Paper section | Description |
 |-------|---------------|-------------|
-| `TypeInferenceModel` | §4.1 | LSTM mapping observation-action history to type embeddings |
-| `AgentModel` | §4.2 | RFM predicting teammate action distributions |
-| `JointActionValueModel` | §4.3 | GNN computing Q-values over ego agent's actions |
-| `GPLAgent` | §4 | Top-level agent: `act()`, `update()`, `save()`, `load()`, `reset()` |
+| `TypeInferenceModel` | §4.2, Eq. 7 | LSTMCell mapping B_t → type vectors θ (hidden state IS the type) |
+| `AgentModel` | §4.4, Eqs. 11-13 | RFM_ζ(θ', c') + MLP_η → teammate action distributions |
+| `JointActionValueModel` | §4.3, Eqs. 8-10 | MLP_β (individual) + MLP_δ (low-rank pairwise) Q-values |
+| `GPLAgent` | §4.1-4.6, Alg. 2-5 | Top-level agent: `act()`, `compute_qv/qjoint/pteam()`, `train_step_online()`, `update()`, `save()`, `load()` |
+
+### `envs/env_utils.py` — PREPROCESS (Appendix C.1)
+
+Converts raw environment state into GPL input format: B_j = [x_j ; u].
+Handles open agent sets with LSTM hidden state carry/zero-init/removal.
 
 ### `experiments/pilot_degradation.py` — Pilot degradation sweep
 
@@ -243,13 +249,14 @@ conda activate drift-aht
 python -m pytest tests/ -v
 ```
 
-Expected output: **21 tests passing**.
+Expected output: **66 tests passing**.
 
-| Test file | What it checks |
-|-----------|----------------|
-| `test_ou_process.py` | Simplex invariance, long-run mean convergence, variance scaling |
-| `test_drift_wrapper.py` | Composition changes across episodes, stable within episode, gym interface |
-| `test_gpl_forward.py` | GPL stubs import cleanly and raise `NotImplementedError` |
+| Test file | Tests | What it checks |
+|-----------|-------|----------------|
+| `test_ou_process.py` | 11 | Simplex invariance, long-run mean convergence, variance scaling, input validation |
+| `test_drift_wrapper.py` | 6 | Composition changes across episodes, stable within episode, gym interface |
+| `test_gpl_forward.py` | 37 | All GPL sub-modules: shapes, forward passes, training, persistence |
+| `test_preprocess.py` | 12 | B_j=[x_j;u] construction, hidden state management for open agent sets |
 
 ---
 

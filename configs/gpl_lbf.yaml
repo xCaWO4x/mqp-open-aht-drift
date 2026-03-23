@@ -1,0 +1,80 @@
+# GPL training configuration for Level-Based Foraging
+# Hyperparameters aligned with Rahman et al. 2023 GPL source code
+# (Open_Experiments/LBF/GPL-Q/)
+
+# --- Environment ---
+env:
+  id: "Foraging-8x8-2p-1f-v3"
+  backend: "gymnasium"       # "gymnasium" for LBF v3
+  n_agents: 2
+  n_food: 1
+  max_steps: 200             # max steps per episode
+
+# --- PREPROCESS dimensions (derived from env) ---
+# x_j = (y, x, level) = 3 features per agent
+# u   = (y, x, level) × n_food = 3 features
+# B_j = [x_j; u] → obs_dim = 3 + 3*n_food = 6
+preprocess:
+  agent_feat_dim: 3          # (y, x, level) per agent
+  food_feat_dim: 3           # (y, x, level) per food
+  obs_dim: 6                 # 3 + 3*1
+
+# --- GPL architecture ---
+# Matches GPL source: LSTMMRF(3, 9, 100, 100, 100, 70, 6, 70, 30, 20)
+model:
+  action_dim: 6              # LBF: 6 discrete actions (noop, up, down, left, right, load)
+  hidden_dim: 100            # LSTM hidden/cell state size
+  type_dim: 100              # type embedding dim (= hidden_dim, no projection)
+  n_gnn_layers: 2            # GNN message-passing rounds in agent model
+  pairwise_rank: 20          # low-rank K for pairwise Q factorisation
+
+# --- Training ---
+training:
+  mode: "online"             # "online" (Alg. 5) or "replay" (buffer variant)
+  n_episodes: 2000           # total training episodes
+  lr: 1.0e-3
+  gamma: 0.99                # discount factor
+  t_update: 4                # gradient accumulation steps before apply
+  t_targ_update: 200         # steps between hard target network copy
+  # NOTE: GPL source uses soft update (polyak τ=0.001).
+  #       Our impl uses hard copy every t_targ_update steps.
+  #       200 steps ≈ 1 episode. Consider adding soft update later.
+  grad_clip: 10.0            # max gradient norm (GPL Wolfpack uses this)
+
+# --- Epsilon schedule ---
+# GPL source: ε = max(0.05, 1.0 * 0.95^(ep/decay_period))
+# Decays from 1.0 → 0.05 over ~1500 episodes
+epsilon:
+  init: 1.0
+  final: 0.05
+  decay_episodes: 1500       # episodes over which to anneal
+
+# --- GPL variant ---
+# GPL-Q: tau = null (Q-learning, Eq. 17)
+# GPL-SPI: tau = float (soft policy iteration, Eqs. 18-19)
+variant: "GPL-Q"
+tau: null                    # null → GPL-Q; set to float for GPL-SPI
+
+# GPL-SPI temperature annealing (only used if variant == "GPL-SPI")
+spi:
+  init_temp: 1.0
+  final_temp: 0.01
+  anneal_method: "linear"    # "linear" or "exponential"
+  anneal_episodes: 1500
+
+# --- Evaluation ---
+eval:
+  eval_every: 50             # evaluate every N episodes
+  eval_episodes: 5           # episodes per evaluation
+  save_every: 50             # checkpoint every N episodes
+
+# --- Logging ---
+logging:
+  wandb_project: "open-aht-drift"
+  wandb_group: "gpl-lbf"
+  tensorboard: true
+  log_dir: "runs/gpl_lbf"
+  results_dir: "results/gpl_lbf"
+
+# --- Reproducibility ---
+seed: 42

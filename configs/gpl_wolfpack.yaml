@@ -1,0 +1,78 @@
+# GPL training configuration for Wolfpack
+# Hyperparameters aligned with Rahman et al. 2023 GPL source code
+# (Open_Experiments/Wolfpack/GPL-Q/)
+
+# --- Environment ---
+env:
+  id: "Adhoc-wolfpack-v5"
+  backend: "gym"             # Wolfpack uses old gym API
+  max_players: 5             # max player slots in observation
+  max_steps: 500             # Wolfpack episodes are longer than LBF
+
+# --- PREPROCESS dimensions (derived from env) ---
+# x_j = (y, x) = 2 features per agent
+# u   = opponent_info = 12 features (2 prey × (2 pos + 4 one-hot orientation))
+# B_j = [x_j; u] → obs_dim = 2 + 12 = 14
+preprocess:
+  agent_feat_dim: 2          # (y, x) per agent
+  opponent_info_dim: 12      # prey positions + orientations
+  obs_dim: 14                # 2 + 12
+
+# --- GPL architecture ---
+# Matches GPL source: LSTMMRF(2, 12, 100, 100, 100, 70, 5, 70, 30, 20)
+model:
+  action_dim: 5              # Wolfpack: 5 discrete actions
+  hidden_dim: 100            # LSTM hidden/cell state size
+  type_dim: 100              # type embedding dim (= hidden_dim, no projection)
+  n_gnn_layers: 2            # GNN message-passing rounds in agent model
+  pairwise_rank: 20          # low-rank K for pairwise Q factorisation
+
+# --- Training ---
+training:
+  mode: "online"             # "online" (Alg. 5) or "replay" (buffer variant)
+  n_episodes: 2000           # total training episodes
+  lr: 1.0e-3
+  gamma: 0.99                # discount factor
+  t_update: 4                # gradient accumulation steps before apply
+  t_targ_update: 200         # steps between hard target network copy
+  # NOTE: GPL source uses soft update (polyak τ=0.001).
+  #       See gpl_lbf.yaml for details.
+  grad_clip: 10.0            # max gradient norm
+
+# --- Epsilon schedule ---
+epsilon:
+  init: 1.0
+  final: 0.05
+  decay_episodes: 1500
+
+# --- GPL variant ---
+variant: "GPL-Q"
+tau: null
+
+# GPL-SPI temperature annealing
+spi:
+  init_temp: 1.0
+  final_temp: 0.01
+  anneal_method: "linear"
+  anneal_episodes: 1500
+
+# --- Evaluation ---
+eval:
+  eval_every: 50
+  eval_episodes: 5
+  save_every: 50
+
+# --- Logging ---
+logging:
+  wandb_project: "open-aht-drift"
+  wandb_group: "gpl-wolfpack"
+  tensorboard: true
+  log_dir: "runs/gpl_wolfpack"
+  results_dir: "results/gpl_wolfpack"
+
+# --- Wolfpack-specific ---
+wolfpack:
+  close_penalty: 0.1         # penalty for wolves being too close
+
+# --- Reproducibility ---
+seed: 42

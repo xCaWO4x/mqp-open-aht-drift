@@ -7,6 +7,8 @@ team composition, and resets the inner environment with that composition.
 Within an episode the composition is held fixed.
 """
 
+from typing import List
+
 try:
     import gymnasium as gym
 except ImportError:
@@ -35,7 +37,7 @@ class DriftWrapper(gym.Wrapper):
         self.n_agents = n_agents
 
         # Current episode state
-        self._composition: list[int] = []
+        self._composition: List[int] = []
         self._ou_state: np.ndarray = ou_process.state
 
     # ------------------------------------------------------------------
@@ -58,7 +60,7 @@ class DriftWrapper(gym.Wrapper):
     # ------------------------------------------------------------------
 
     @property
-    def composition(self) -> list[int]:
+    def composition(self) -> List[int]:
         """Current team composition as a list of agent-type indices."""
         return list(self._composition)
 
