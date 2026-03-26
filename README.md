@@ -106,25 +106,27 @@ open-aht-drift/
 │       └── random_agent.py     # sanity check baseline
 ├── drift/
 │   ├── ou_process.py           # OU process over simplex ✓
-│   ├── drift_schedule.py       # controls how drift is applied across episodes
-│   └── belief_tracker.py       # placeholder for future Bayesian filter adapter
-├── eval/
+│   ├── drift_schedule.py       # (planned) controls how drift is applied across episodes
+│   └── belief_tracker.py       # (planned) Bayesian filter adapter for drift-aware GPL
+├── eval/                        # (planned) evaluation utilities
 │   ├── metrics.py              # IQM, recovery speed, degradation curve utilities
 │   ├── stability_region.py     # tools for sweeping (sigma, theta) grid
 │   └── logger.py               # wandb/tensorboard logging wrapper
 ├── experiments/
-│   ├── pilot_degradation.py    # FIRST SCRIPT TO RUN: GPL under OU drift sweep
-│   ├── train_gpl.py            # GPL training on standard LBF/Wolfpack
-│   └── eval_drift.py           # evaluation under drift given a trained checkpoint
+│   ├── pilot_degradation.py    # pilot sweep with RandomAgent (to be swapped for GPL)
+│   ├── train_gpl.py            # (planned) GPL training on standard LBF/Wolfpack
+│   └── eval_drift.py           # (planned) evaluation under drift given a trained checkpoint
 ├── configs/
 │   ├── gpl_lbf.yaml            # hyperparameters for GPL on LBF
 │   ├── gpl_wolfpack.yaml       # hyperparameters for GPL on Wolfpack
 │   └── drift_sweep.yaml        # (sigma, theta) grid for pilot experiment
+├── docs/
+│   └── research_proposal.md    # formalized research proposal with citations
 ├── tests/
 │   ├── test_ou_process.py      # unit tests for OUProcess ✓ (11 tests)
 │   ├── test_drift_wrapper.py   # unit tests for DriftWrapper ✓ (6 tests)
-│   ├── test_gpl_forward.py     # GPL forward pass + training tests ✓ (37 tests)
-│   └── test_preprocess.py      # PREPROCESS + hidden state management ✓ (12 tests)
+│   ├── test_gpl_forward.py     # GPL forward pass + training tests ✓ (36 tests)
+│   └── test_preprocess.py      # generic preprocess() + hidden state management ✓ (13 tests)
 ├── requirements.txt
 └── setup.py
 ```
@@ -164,7 +166,10 @@ x ← project_onto_simplex(x)
 `gym.Wrapper` that applies OU drift to any LBF or Wolfpack environment.
 
 - **On `reset()`**: advances the OU process, samples a new team composition,
-  resets the inner environment.
+  resets the inner environment. **Note**: the sampled composition is stored as
+  metadata (`.composition`) but is not yet passed into the inner env's reset —
+  the env dynamics are unchanged. Integration that maps type indices to actual
+  env parameters (e.g., agent levels in LBF) is deferred to Step 13.
 - **On `step()`**: passes through unchanged — composition is fixed within an episode.
 - **Properties**: `.composition` (list of type indices), `.ou_state` (frequency vector).
 
@@ -183,18 +188,18 @@ print(env.ou_state)        # e.g. [0.45, 0.30, 0.25]
 ### `agents/baselines/random_agent.py` — `RandomAgent`
 
 Minimal baseline that uniformly samples from the action space, ignoring
-observations. Used as a sanity-check placeholder in the pilot experiment
-before GPL is implemented.
+observations. Used as the pilot experiment placeholder until a trained GPL
+checkpoint is wired in (Step 15).
 
 ### `agents/gpl/` — GPL (fully implemented)
 
 Complete implementation of Graph-based Policy Learning aligned with
 Rahman et al. 2023 ([arXiv:2210.05448](https://arxiv.org/abs/2210.05448)),
-Appendix A (Algorithms 2-5) and C.1 (PREPROCESS).
+Appendix A (Algorithms 2-5). PREPROCESS (C.1) is in `envs/env_utils.py`.
 
 | Class | Paper section | Description |
 |-------|---------------|-------------|
-| `TypeInferenceModel` | §4.2, Eq. 7 | LSTMCell mapping B_t → type vectors θ (hidden state IS the type) |
+| `TypeInferenceModel` | §4.2, Eq. 7 | LSTMCell mapping B_t → type vectors θ (hidden state projected to type_dim; identity when type_dim = hidden_dim) |
 | `AgentModel` | §4.4, Eqs. 11-13 | RFM_ζ(θ', c') + MLP_η → teammate action distributions |
 | `JointActionValueModel` | §4.3, Eqs. 8-10 | MLP_β (individual) + MLP_δ (low-rank pairwise) Q-values |
 | `GPLAgent` | §4.1-4.6, Alg. 2-5 | Top-level agent: `act()`, `compute_qv/qjoint/pteam()`, `train_step_online()`, `update()`, `save()`, `load()` |
@@ -255,8 +260,8 @@ Expected output: **66 tests passing**.
 |-----------|-------|----------------|
 | `test_ou_process.py` | 11 | Simplex invariance, long-run mean convergence, variance scaling, input validation |
 | `test_drift_wrapper.py` | 6 | Composition changes across episodes, stable within episode, gym interface |
-| `test_gpl_forward.py` | 37 | All GPL sub-modules: shapes, forward passes, training, persistence |
-| `test_preprocess.py` | 12 | B_j=[x_j;u] construction, hidden state management for open agent sets |
+| `test_gpl_forward.py` | 36 | All GPL sub-modules: shapes, forward passes, training, persistence |
+| `test_preprocess.py` | 13 | Generic `preprocess()`: B_j=[x_j;u] construction, hidden state management. Note: `preprocess_lbf`/`preprocess_wolfpack` not yet covered. |
 
 ---
 
