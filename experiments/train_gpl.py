@@ -142,7 +142,7 @@ def evaluate(
                 obs, n_agents, n_food,
                 hidden_dim=hidden_dim, device=device,
             )
-            action = agent.act(B.numpy(), learner_idx=0, epsilon=0.0)
+            action = agent.act(B.cpu().numpy(), learner_idx=0, epsilon=0.0)
 
             # All agents act: learner picks action, others use uniform random
             joint_action = [rng.integers(0, 6) for _ in range(n_agents)]
@@ -210,7 +210,16 @@ def train(cfg: dict, smoke_test: bool = False):
     action_dim = model_cfg["action_dim"]
     hidden_dim = model_cfg["hidden_dim"]
     n_episodes = 5 if smoke_test else train_cfg["n_episodes"]
-    device = "cpu"
+    # Auto-detect best available device. CUDA is used on HPC clusters.
+    # MPS (Apple Silicon) is slower than CPU for online RL batch_size=1
+    # due to Metal command overhead on tiny batches — fall back to CPU there.
+    if "device" in cfg:
+        device = cfg["device"]
+    elif torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"   # MPS intentionally skipped: slower than CPU here
+    print(f"Using device: {device}")
     seed = cfg.get("seed", 42)
 
     food_probs = food_cfg.get("fixed_level_probs", {2: 0.6, 3: 0.4})
@@ -299,7 +308,7 @@ def train(cfg: dict, smoke_test: bool = False):
                 obs, n_agents, n_food,
                 hidden_dim=hidden_dim, device=device,
             )
-            B_np = B.numpy()
+            B_np = B.cpu().numpy()
 
             # Select action (epsilon-greedy)
             action = agent.act(B_np, learner_idx=0, epsilon=epsilon)
@@ -337,7 +346,7 @@ def train(cfg: dict, smoke_test: bool = False):
                 next_obs, n_agents, n_food,
                 hidden_dim=hidden_dim, device=device,
             )
-            B_next_np = B_next.numpy()
+            B_next_np = B_next.cpu().numpy()
 
             # Build joint action array for training
             joint_action_arr = np.array(joint_action)
@@ -418,6 +427,10 @@ def main():
     parser.add_argument("--n-episodes", type=int, default=None,
                         help="Override number of training episodes")
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument(
+        "--device", type=str, default=None,
+        help="Force device (cpu/mps/cuda). Default: cpu (fastest for online RL batch_size=1)",
+    )
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -427,6 +440,8 @@ def main():
         cfg["training"]["n_episodes"] = args.n_episodes
     if args.seed is not None:
         cfg["seed"] = args.seed
+    if args.device is not None:
+        cfg["device"] = args.device
 
     train(cfg, smoke_test=args.smoke_test)
 

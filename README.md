@@ -108,14 +108,14 @@ open-aht-drift/
 │   ├── ou_process.py           # OU process over simplex ✓
 │   ├── drift_schedule.py       # (planned) controls how drift is applied across episodes
 │   └── belief_tracker.py       # (planned) Bayesian filter adapter for drift-aware GPL
-├── eval/                        # (planned) evaluation utilities
-│   ├── metrics.py              # IQM, recovery speed, degradation curve utilities
-│   ├── stability_region.py     # tools for sweeping (sigma, theta) grid
-│   └── logger.py               # wandb/tensorboard logging wrapper
+├── eval/                        # evaluation utilities
+│   ├── metrics.py              # (planned) IQM, recovery speed, degradation curve utilities
+│   ├── stability_region.py     # (planned) tools for sweeping (sigma, theta) grid
+│   └── logger.py               # wandb/tensorboard logging wrapper ✓
 ├── experiments/
 │   ├── pilot_degradation.py    # pilot sweep with RandomAgent (to be swapped for GPL)
 │   ├── train_gpl.py            # GPL training on LBF (Algorithm 5) ✓
-│   └── eval_drift.py           # (planned) evaluation under drift given a trained checkpoint
+│   └── eval_drift.py           # drift evaluation: single-point + grid sweep ✓
 ├── configs/
 │   ├── gpl_lbf.yaml            # hyperparameters for GPL on LBF
 │   ├── gpl_wolfpack.yaml       # hyperparameters for GPL on Wolfpack
@@ -243,6 +243,30 @@ python experiments/pilot_degradation.py --dry-run
 
 # Custom config
 python experiments/pilot_degradation.py --config configs/my_sweep.yaml
+```
+
+### `experiments/eval_drift.py` — Drift evaluation
+
+Evaluates a trained GPL checkpoint under OU-process composition drift.
+Two modes of operation:
+
+- **Single point**: Evaluate at one (sigma, theta) pair, produces per-episode CSV
+  and 3-panel trajectory plot (returns, agent levels, OU type frequencies).
+- **Grid sweep**: Full (sigma, theta) grid across multiple seeds, produces
+  aggregate + per-episode CSVs and side-by-side mean/IQM heatmaps.
+
+```bash
+# Single point (default: sigma=0.1, theta=0.15)
+python experiments/eval_drift.py --checkpoint results/gpl_lbf/checkpoints/gpl_final.pt
+
+# Custom sigma/theta
+python experiments/eval_drift.py --checkpoint path.pt --sigma 0.2 --theta 0.3
+
+# Full grid sweep (uses configs/drift_sweep.yaml)
+python experiments/eval_drift.py --checkpoint path.pt --sweep
+
+# Smoke test (3 episodes, reduced grid)
+python experiments/eval_drift.py --checkpoint path.pt --smoke-test
 ```
 
 ### `configs/drift_sweep.yaml`
