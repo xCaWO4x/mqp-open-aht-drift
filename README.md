@@ -114,7 +114,7 @@ open-aht-drift/
 │   └── logger.py               # wandb/tensorboard logging wrapper
 ├── experiments/
 │   ├── pilot_degradation.py    # pilot sweep with RandomAgent (to be swapped for GPL)
-│   ├── train_gpl.py            # (planned) GPL training on standard LBF/Wolfpack
+│   ├── train_gpl.py            # GPL training on LBF (Algorithm 5) ✓
 │   └── eval_drift.py           # (planned) evaluation under drift given a trained checkpoint
 ├── configs/
 │   ├── gpl_lbf.yaml            # hyperparameters for GPL on LBF
@@ -163,26 +163,39 @@ x ← project_onto_simplex(x)
 
 ### `envs/drift_wrapper.py` — `DriftWrapper`
 
-`gym.Wrapper` that applies OU drift to any LBF or Wolfpack environment.
+`gym.Wrapper` that applies OU drift to an LBF environment with full level injection.
 
-- **On `reset()`**: advances the OU process, samples a new team composition,
-  resets the inner environment. **Note**: the sampled composition is stored as
-  metadata (`.composition`) but is not yet passed into the inner env's reset —
-  the env dynamics are unchanged. Integration that maps type indices to actual
-  env parameters (e.g., agent levels in LBF) is deferred to Step 13.
+- **On `reset()`**:
+  1. Advances the OU process on the type-frequency simplex.
+  2. Samples agent composition (type indices) via multinomial draw.
+  3. Maps types to LBF levels (type 0 -> level 1, etc.).
+  4. Samples food levels from configured distribution.
+  5. Injects exact levels into inner env (`min=max=desired_level`).
+  6. Resets inner env.
 - **On `step()`**: passes through unchanged — composition is fixed within an episode.
-- **Properties**: `.composition` (list of type indices), `.ou_state` (frequency vector).
+- **Food modes**: `"fixed"` (primary: levels from {2: 0.6, 3: 0.4}) or `"coupled"` (ablation: centered on mean agent level).
+- **Properties**: `.composition`, `.agent_levels`, `.food_levels`, `.ou_state`.
+- **`episode_summary()`**: returns logging dict with target distribution, realized composition, agent/food levels, mean/total stats.
+
+The inner `ForagingEnv` must be created with `min_player_level=1, max_player_level=K`
+so the observation space accommodates all possible levels.
 
 ```python
+from lbforaging.foraging.environment import ForagingEnv
 from drift.ou_process import OUProcess
 from envs.drift_wrapper import DriftWrapper
 
+inner = ForagingEnv(players=3, min_player_level=[1,1,1], max_player_level=[3,3,3],
+                    field_size=(8,8), max_num_food=3, min_food_level=[1,1,1],
+                    max_food_level=[3,3,3], sight=8, max_episode_steps=200,
+                    force_coop=True)
 ou = OUProcess(K=3, theta=0.15, sigma=0.2, seed=42)
-env = DriftWrapper(inner_env, ou_process=ou, n_agents=4)
+env = DriftWrapper(inner, ou, n_agents=3, n_food=3, food_mode="fixed", seed=42)
 
-obs = env.reset()          # OU advances, new composition sampled
-print(env.composition)     # e.g. [0, 2, 0, 1]
-print(env.ou_state)        # e.g. [0.45, 0.30, 0.25]
+obs = env.reset()
+print(env.agent_levels)    # e.g. [3, 1, 2]
+print(env.food_levels)     # e.g. [2, 3, 2]
+print(env.episode_summary())
 ```
 
 ### `agents/baselines/random_agent.py` — `RandomAgent`
@@ -238,12 +251,16 @@ Default sweep configuration:
 
 | Parameter | Value |
 |-----------|-------|
-| Environment | `Foraging-8x8-2p-1f-v3` (LBF, 2 players, 1 food) |
-| Agent types (K) | 3 |
+| Environment | LBF 8x8, 3 agents, 3 food, force_coop=True |
+| Agent types (K) | 3 (levels 1, 2, 3) |
+| Food mode | "fixed" — levels from {2: 0.6, 3: 0.4} |
 | Sigmas | 0.01, 0.05, 0.1, 0.2, 0.5 |
 | Thetas | 0.05, 0.15, 0.3, 0.5, 1.0 |
 | Episodes per grid point | 50 |
+| Seeds | 5 (bootstrap CIs) |
 | Max steps per episode | 200 |
+| Stability threshold | 10% degradation |
+| Primary metric | IQM return |
 
 ---
 
@@ -254,12 +271,12 @@ conda activate drift-aht
 python -m pytest tests/ -v
 ```
 
-Expected output: **66 tests passing**.
+Expected output: **83 tests passing**.
 
 | Test file | Tests | What it checks |
 |-----------|-------|----------------|
 | `test_ou_process.py` | 11 | Simplex invariance, long-run mean convergence, variance scaling, input validation |
-| `test_drift_wrapper.py` | 6 | Composition changes across episodes, stable within episode, gym interface |
+| `test_drift_wrapper.py` | 23 | Food sampling (fixed/coupled), level injection, composition drift, food modes, episode summary |
 | `test_gpl_forward.py` | 36 | All GPL sub-modules: shapes, forward passes, training, persistence |
 | `test_preprocess.py` | 13 | Generic `preprocess()`: B_j=[x_j;u] construction, hidden state management. Note: `preprocess_lbf`/`preprocess_wolfpack` not yet covered. |
 
