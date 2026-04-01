@@ -2,11 +2,15 @@
 # Grid of (sigma, theta) OU parameters to evaluate
 
 env:
-  id: "Foraging-8x8-2p-1f-v3"
-  n_agents: 2
+  grid_size: 8
+  n_agents: 3
+  n_food: 3
+  max_steps: 200
+  force_coop: true
+  sight: 8
 
 ou:
-  K: 3               # number of agent types
+  K: 3                # number of agent types (levels 1, 2, 3)
   dt: 0.01
   mu: null            # uniform by default
 
@@ -14,9 +18,18 @@ sweep:
   sigmas: [0.01, 0.05, 0.1, 0.2, 0.5]
   thetas: [0.05, 0.15, 0.3, 0.5, 1.0]
 
+food:
+  mode: "fixed"
+  n_food: 3
+  fixed_level_probs:
+    2: 0.6
+    3: 0.4
+
 eval:
   n_episodes: 50      # episodes per (sigma, theta) grid point
-  max_steps: 200      # max steps per episode
+  n_seeds: 5          # seeds for bootstrap CIs
+  stability_threshold: 0.10
+  primary_metric: "iqm_return"
   seed: 42
 
 logging:
