@@ -490,6 +490,7 @@ def main():
         tau=cfg.get("tau", None),
         t_update=cfg["training"]["t_update"],
         t_targ_update=cfg["training"]["t_targ_update"],
+        polyak_tau=cfg["training"].get("polyak_tau", None),
         device="cpu",
     )
     agent.load(args.checkpoint)

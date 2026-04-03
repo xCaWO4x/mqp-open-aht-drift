@@ -9,8 +9,8 @@ env:
   grid_size: 8
   n_agents: 3
   n_food: 3
-  max_steps: 200
-  force_coop: true
+  max_steps: 50                    # paper: 50 (NOT 200)
+  force_coop: false                 # paper: no forced coop — high-level agent can solo-collect low food
   sight: 8                      # full observability
 
 # --- Agent types (= LBF levels) ---
@@ -53,26 +53,27 @@ model:
   hidden_dim: 100               # LSTM hidden/cell state size
   type_dim: 100                 # type embedding dim (= hidden_dim, no projection)
   n_gnn_layers: 2               # GNN message-passing rounds in agent model
-  pairwise_rank: 20             # low-rank K for pairwise Q factorisation
+  pairwise_rank: 5              # paper: K=5 for low-rank pairwise Q
 
 # --- Training ---
 training:
   mode: "online"                # "online" (Alg. 5) or "replay" (buffer variant)
-  n_episodes: 2000              # total training episodes
-  lr: 1.0e-3
+  n_episodes: 128000            # paper: ~128K episodes (6.4M steps / 50 steps)
+  n_envs: 16                    # paper: 16 parallel environments
+  lr: 2.5e-4                    # paper: 2.5e-4 (Adam)
   gamma: 0.99                   # discount factor
-  t_update: 4                   # gradient accumulation steps before apply
-  t_targ_update: 200            # steps between hard target network copy
-  # NOTE: GPL source uses soft update (polyak tau=0.001).
-  #       Our impl uses hard copy every t_targ_update steps.
+  t_update: 4                   # gradient accumulation over 4 parallel steps
+  t_targ_update: 1              # soft update every step (Polyak averaging)
+  polyak_tau: 1.0e-3            # paper: alpha=1e-3 soft update
   grad_clip: 10.0               # max gradient norm
 
 # --- Epsilon schedule ---
-# GPL source: decays from 1.0 -> 0.05 over ~1500 episodes
+# Paper: decays from 1.0 -> 0.05 over 4.8M env steps
 epsilon:
   init: 1.0
   final: 0.05
-  decay_episodes: 1500
+  decay_steps: 4800000          # step-based decay (paper)
+  decay_episodes: 1500          # fallback if decay_steps not set
 
 # --- GPL variant ---
 # GPL-Q: tau = null (Q-learning, Eq. 17)

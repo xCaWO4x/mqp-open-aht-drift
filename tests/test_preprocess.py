@@ -16,7 +16,7 @@ import pytest
 import numpy as np
 import torch
 
-from envs.env_utils import preprocess
+from envs.env_utils import preprocess, preprocess_lbf
 
 
 # ======================================================================
@@ -261,3 +261,111 @@ class TestPreprocessHiddenStates:
         # Agent 5: new → zeros
         assert (hidden[0][1] == 0).all()
         assert (hidden[1][1] == 0).all()
+
+
+# ======================================================================
+# preprocess_lbf — LBF-specific observation parsing
+# ======================================================================
+
+class TestPreprocessLBF:
+    """Tests for preprocess_lbf to verify correct food-first observation parsing."""
+
+    def _make_lbf_obs(self, n_agents=3, n_food=3):
+        """Create synthetic LBF per-agent observations.
+
+        LBF obs format per agent i:
+            [food_0(y,x,level), ..., food_m(y,x,level), self(y,x,level), other_0(y,x,level), ...]
+
+        Food features come FIRST, then agent features (self first among agents).
+        """
+        # Distinct values so we can verify correct extraction
+        food_positions = np.array([
+            [1.0, 2.0, 3.0],   # food 0: y=1, x=2, level=3
+            [4.0, 5.0, 6.0],   # food 1: y=4, x=5, level=6
+            [7.0, 8.0, 9.0],   # food 2: y=7, x=8, level=9
+        ], dtype=np.float32)[:n_food]
+
+        agent_positions = np.array([
+            [10.0, 11.0, 12.0],  # agent 0: y=10, x=11, level=12
+            [20.0, 21.0, 22.0],  # agent 1: y=20, x=21, level=22
+            [30.0, 31.0, 32.0],  # agent 2: y=30, x=31, level=32
+        ], dtype=np.float32)[:n_agents]
+
+        per_agent_obs = []
+        for i in range(n_agents):
+            # Food comes first
+            food_part = food_positions.flatten()
+            # Self comes next
+            self_part = agent_positions[i]
+            # Others follow
+            others = [agent_positions[j] for j in range(n_agents) if j != i]
+            others_part = np.concatenate(others) if others else np.array([], dtype=np.float32)
+            obs_i = np.concatenate([food_part, self_part, others_part])
+            per_agent_obs.append(obs_i)
+
+        return per_agent_obs, agent_positions, food_positions
+
+    def test_output_shape(self):
+        """B should be (n_agents, 3 + 3*n_food)."""
+        obs, _, _ = self._make_lbf_obs(n_agents=3, n_food=3)
+        B, hidden, ids = preprocess_lbf(obs, n_agents=3, n_food=3, hidden_dim=HIDDEN_DIM)
+        assert B.shape == (3, 3 + 3 * 3)  # (3, 12)
+        assert hidden[0].shape == (3, HIDDEN_DIM)
+        assert ids == [0, 1, 2]
+
+    def test_agent_features_extracted_correctly(self):
+        """Each agent's x_j should be their (y, x, level), NOT food features."""
+        obs, agent_pos, food_pos = self._make_lbf_obs(n_agents=3, n_food=3)
+        B, _, _ = preprocess_lbf(obs, n_agents=3, n_food=3, hidden_dim=HIDDEN_DIM)
+
+        # B_j = [x_j; u] where x_j = agent j's (y, x, level), u = food features
+        for j in range(3):
+            x_j = B[j, :3].numpy()
+            np.testing.assert_array_almost_equal(
+                x_j, agent_pos[j],
+                err_msg=f"Agent {j} features should be {agent_pos[j]}, got {x_j}"
+            )
+
+    def test_food_features_are_shared(self):
+        """The shared portion u should be the food features, identical for all agents."""
+        obs, _, food_pos = self._make_lbf_obs(n_agents=3, n_food=3)
+        B, _, _ = preprocess_lbf(obs, n_agents=3, n_food=3, hidden_dim=HIDDEN_DIM)
+
+        expected_food = food_pos.flatten()
+        for j in range(3):
+            u_j = B[j, 3:].numpy()
+            np.testing.assert_array_almost_equal(
+                u_j, expected_food,
+                err_msg=f"Agent {j}'s shared features should be food, got {u_j}"
+            )
+
+    def test_food_not_confused_with_agents(self):
+        """Regression: the first 3 features of B_j must NOT be food[0]."""
+        obs, agent_pos, food_pos = self._make_lbf_obs(n_agents=3, n_food=3)
+        B, _, _ = preprocess_lbf(obs, n_agents=3, n_food=3, hidden_dim=HIDDEN_DIM)
+
+        # Agent 0's features should be [10, 11, 12], NOT food[0] = [1, 2, 3]
+        x_0 = B[0, :3].numpy()
+        assert not np.allclose(x_0, food_pos[0]), \
+            f"BUG: Agent 0 features = food[0] ({food_pos[0]}), observation parsing is backwards!"
+        np.testing.assert_array_almost_equal(x_0, agent_pos[0])
+
+    def test_single_agent_single_food(self):
+        """Edge case: 1 agent, 1 food."""
+        obs, agent_pos, food_pos = self._make_lbf_obs(n_agents=1, n_food=1)
+        B, _, ids = preprocess_lbf(obs, n_agents=1, n_food=1, hidden_dim=HIDDEN_DIM)
+        assert B.shape == (1, 3 + 3)  # (1, 6)
+        assert ids == [0]
+        np.testing.assert_array_almost_equal(B[0, :3].numpy(), agent_pos[0])
+        np.testing.assert_array_almost_equal(B[0, 3:].numpy(), food_pos[0])
+
+    def test_flat_global_state_input(self):
+        """When raw_obs is already a flat array, should work via else branch."""
+        # Flat format: [agent_0(3), agent_1(3), food(3*2)]
+        flat = np.array([10, 11, 12, 20, 21, 22, 1, 2, 3, 4, 5, 6], dtype=np.float32)
+        B, _, ids = preprocess_lbf(flat, n_agents=2, n_food=2, hidden_dim=HIDDEN_DIM)
+        assert B.shape == (2, 3 + 6)  # (2, 9)
+        np.testing.assert_array_almost_equal(B[0, :3].numpy(), [10, 11, 12])
+        np.testing.assert_array_almost_equal(B[1, :3].numpy(), [20, 21, 22])
+        np.testing.assert_array_almost_equal(B[0, 3:].numpy(), [1, 2, 3, 4, 5, 6])
+        np.testing.assert_array_almost_equal(B[1, 3:].numpy(), [1, 2, 3, 4, 5, 6])

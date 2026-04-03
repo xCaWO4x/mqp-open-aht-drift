@@ -119,20 +119,21 @@ def preprocess(
 # LBF PREPROCESS
 # ======================================================================
 
-# LBF obs layout (standard gymnasium, per-agent, ego-centric):
-#   Agent i's obs = [self_y, self_x, self_level,
-#                    other1_y, other1_x, other1_level,
+# LBF obs layout (from _make_gym_obs in lbforaging/foraging/environment.py):
+#   Agent i's obs = [food_0_y, food_0_x, food_0_level,
+#                    food_1_y, food_1_x, food_1_level,
 #                    ...,
-#                    food1_y, food1_x, food1_level, ...]
+#                    self_y, self_x, self_level,
+#                    other1_y, other1_x, other1_level, ...]
+#
+# **FOOD features come FIRST, then AGENT features.**
 #
 # Layout sizes:
-#   agent features: 3 per agent (y, x, level)
-#   food features:  3 per food  (y, x, level)
-#   total per-agent obs = 3 * n_agents + 3 * n_food
+#   food features:  3 per food  (y, x, level)   — FIRST
+#   agent features: 3 per agent (y, x, level)   — SECOND (self first among agents)
+#   total per-agent obs = 3 * n_food + 3 * n_agents
 #
-# Self is always first. Other agents follow. Then all food items.
-#
-# For PREPROCESS, we reconstruct global state from the multi-agent obs tuple:
+# For PREPROCESS, we reconstruct global state and produce:
 #   x_j = agent j's (y, x, level) — 3 features
 #   u   = food features — 3 * n_food features
 #   B_j = [x_j ; u]
@@ -152,8 +153,9 @@ def preprocess_lbf(
 ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor], List[int]]:
     """PREPROCESS specialised for Level-Based Foraging.
 
-    LBF (gymnasium) returns a tuple of per-agent ego-centric observations.
-    Each agent's obs is: [self(3), other_agents(3 each), food(3 each)].
+    LBF returns a tuple of per-agent ego-centric observations.
+    Each agent's obs is: [food(3 each), self(3), other_agents(3 each)].
+    Food features come FIRST, then agent features (self first among agents).
 
     We reconstruct the global state and produce:
         x_j = agent j's (y, x, level) = 3 features
@@ -163,7 +165,8 @@ def preprocess_lbf(
     Parameters
     ----------
     raw_obs : tuple/list of arrays
-        Per-agent observations from gymnasium LBF. Each shape (3*n_agents + 3*n_food,).
+        Per-agent observations from LBF. Each shape (3*n_food + 3*n_agents,).
+        Format: [food_0(3), ..., food_m(3), self(3), other_0(3), ..., other_n(3)]
         OR a single flat array (already global state).
     n_agents : int
         Number of agents in the environment.
@@ -184,30 +187,30 @@ def preprocess_lbf(
     """
     if isinstance(raw_obs, (list, tuple)):
         # Multi-agent obs: reconstruct global state from ego-centric views.
-        # From agent 0's perspective:
-        #   [self(3), agent_1(3), ..., agent_{n-1}(3), food_0(3), ..., food_{m-1}(3)]
-        # From agent i's perspective, self is always first, then others in order.
+        # LBF obs format: [food(3*n_food), self(3), others(3*(n_agents-1))]
+        # Food comes FIRST, then agents (self first among agents).
         #
-        # Strategy: extract each agent's own features from their ego obs[0:3],
-        # and shared food features from any agent's obs[n_agents*3:].
+        # Strategy: extract each agent's own features from their ego obs,
+        # and shared food features from any agent's obs.
+
+        food_end = n_food * LBF_FOOD_FEAT_DIM
+        agent_start = food_end  # agents start right after food
 
         agent_features = []   # list of (y, x, level) per agent
         for i in range(n_agents):
             obs_i = np.asarray(raw_obs[i], dtype=np.float32)
-            # Self features are always the first 3 elements
-            agent_features.append(obs_i[:LBF_AGENT_FEAT_DIM])
+            # Self agent features start at food_end (first among agents)
+            agent_features.append(obs_i[agent_start:agent_start + LBF_AGENT_FEAT_DIM])
 
-        # Food features from agent 0 (same for all agents)
+        # Food features from agent 0 (same positions for all, may differ in order)
         obs_0 = np.asarray(raw_obs[0], dtype=np.float32)
-        food_start = n_agents * LBF_AGENT_FEAT_DIM
-        food_features = obs_0[food_start:]
+        food_features = obs_0[:food_end]
 
         # Build a flat global state: [agent_0(3), agent_1(3), ..., food(3*n_food)]
         global_state = np.concatenate(agent_features + [food_features])
     else:
         # Already a flat global state
         global_state = np.asarray(raw_obs, dtype=np.float32)
-        food_start = n_agents * LBF_AGENT_FEAT_DIM
 
     # Build slices for the generic preprocess
     agent_feature_slices = {}

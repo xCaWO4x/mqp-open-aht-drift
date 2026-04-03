@@ -5,8 +5,8 @@ env:
   grid_size: 8
   n_agents: 3
   n_food: 3
-  max_steps: 200
-  force_coop: true
+  max_steps: 50
+  force_coop: false
   sight: 8
 
 ou:

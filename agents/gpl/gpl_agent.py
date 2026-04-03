@@ -85,6 +85,7 @@ class GPLAgent:
         tau: float = None,
         t_update: int = 1,
         t_targ_update: int = 200,
+        polyak_tau: float = None,
         device: str = "cpu",
     ):
         self.obs_dim = obs_dim
@@ -95,6 +96,7 @@ class GPLAgent:
         self.tau = tau
         self.t_update = t_update
         self.t_targ_update = t_targ_update
+        self.polyak_tau = polyak_tau  # if set, use soft update instead of hard copy
         self.device = torch.device(device)
         self._step_count = 0
 
@@ -498,8 +500,14 @@ class GPLAgent:
 
         # ---- Lines 24-25: Target network update every t_targ_update ----
         if self._step_count % self.t_targ_update == 0:
-            self.q_network_target.load_state_dict(self.q_network.state_dict())
-            self.type_net_q_target.load_state_dict(self.type_net_q.state_dict())
+            if self.polyak_tau is not None:
+                # Soft update (Polyak averaging): φ' ← (1-α)φ' + αφ
+                self._soft_update(self.q_network, self.q_network_target, self.polyak_tau)
+                self._soft_update(self.type_net_q, self.type_net_q_target, self.polyak_tau)
+            else:
+                # Hard copy
+                self.q_network_target.load_state_dict(self.q_network.state_dict())
+                self.type_net_q_target.load_state_dict(self.type_net_q.state_dict())
 
         # ---- Line 27: Carry hidden states forward ----
         with torch.no_grad():
@@ -607,13 +615,27 @@ class GPLAgent:
         # Target network update
         self._step_count += 1
         if self._step_count % self.t_targ_update == 0:
-            self.q_network_target.load_state_dict(self.q_network.state_dict())
-            self.type_net_q_target.load_state_dict(self.type_net_q.state_dict())
+            if self.polyak_tau is not None:
+                self._soft_update(self.q_network, self.q_network_target, self.polyak_tau)
+                self._soft_update(self.type_net_q, self.type_net_q_target, self.polyak_tau)
+            else:
+                self.q_network_target.load_state_dict(self.q_network.state_dict())
+                self.type_net_q_target.load_state_dict(self.type_net_q.state_dict())
 
         return {
             "agent_model_loss": nll.item(),
             "q_loss": td_loss.item(),
         }
+
+    # ------------------------------------------------------------------
+    # Utilities
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _soft_update(source: nn.Module, target: nn.Module, tau: float):
+        """Polyak averaging: φ' ← (1-τ)φ' + τφ."""
+        for src_p, tgt_p in zip(source.parameters(), target.parameters()):
+            tgt_p.data.mul_(1.0 - tau).add_(src_p.data, alpha=tau)
 
     # ------------------------------------------------------------------
     # Persistence

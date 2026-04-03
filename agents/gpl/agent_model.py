@@ -65,9 +65,11 @@ class AgentModel(nn.Module):
         node_input_dim = type_dim + lstm_hidden_dim
 
         # --- GNN_ζ (Eq. 11): message-passing on fully-connected agent graph ---
+        # Paper Figure 7(d,e): edge FC(30)→ReLU→FC(70), node FC(30)→ReLU→FC(70)
+        self.gnn_hidden = 70  # GNN internal width (paper)
 
-        # Node encoder: (θ, c) → hidden_dim
-        self.node_encoder = nn.Linear(node_input_dim, hidden_dim)
+        # Node encoder: (θ, c) → gnn_hidden
+        self.node_encoder = nn.Linear(node_input_dim, self.gnn_hidden)
 
         # Message-passing layers.  Each round:
         #   message_{j→k} = MLP_msg(concat(h_j, h_k))
@@ -75,20 +77,25 @@ class AgentModel(nn.Module):
         self.msg_fns = nn.ModuleList()
         self.update_fns = nn.ModuleList()
         for _ in range(n_gnn_layers):
+            # Paper Figure 7(d): edge FC(30)→ReLU→FC(70)
             self.msg_fns.append(nn.Sequential(
-                nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.Linear(self.gnn_hidden * 2, 30),
                 nn.ReLU(),
+                nn.Linear(30, self.gnn_hidden),
             ))
+            # Paper Figure 7(e): node FC(30)→ReLU→FC(70)
             self.update_fns.append(nn.Sequential(
-                nn.Linear(hidden_dim, hidden_dim),
+                nn.Linear(self.gnn_hidden, 30),
                 nn.ReLU(),
+                nn.Linear(30, self.gnn_hidden),
             ))
 
         # --- MLP_η (Eq. 12): per-agent embedding → action logits ---
+        # Paper Figure 7(f): FC(20)→ReLU→FC(|A|)
         self.action_head = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(self.gnn_hidden, 20),
             nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim),
+            nn.Linear(20, action_dim),
         )
 
     def forward(self, theta, cell_state):
@@ -119,8 +126,8 @@ class AgentModel(nn.Module):
         # Message passing (Eq. 11): RFM_ζ
         for msg_fn, update_fn in zip(self.msg_fns, self.update_fns):
             # Pairwise messages on fully-connected graph
-            h_i = h.unsqueeze(2).expand(B, N, N, self.hidden_dim)
-            h_j = h.unsqueeze(1).expand(B, N, N, self.hidden_dim)
+            h_i = h.unsqueeze(2).expand(B, N, N, self.gnn_hidden)
+            h_j = h.unsqueeze(1).expand(B, N, N, self.gnn_hidden)
 
             # Message from j to i: msg_fn(concat(h_j, h_i))
             messages = msg_fn(torch.cat([h_j, h_i], dim=-1))  # (B, N, N, hidden)
