@@ -1,0 +1,89 @@
+# LABEL: GPL_LBF_TRAIN_03 — 20% paper episode budget (25.6k ep), scaled ε decay
+# Shortest preset for quick drift eval smoke tests; same 16 envs / LR / model as paper.
+
+# --- Environment ---
+env:
+  id: "Foraging-8x8-3p-3f-v3"
+  backend: "gymnasium"
+  grid_size: 8
+  n_agents: 3
+  n_food: 3
+  max_steps: 50
+  force_coop: false
+  sight: 8
+
+types:
+  K: 3
+  levels: [1, 2, 3]
+  level_offset: 1
+
+ou:
+  K: 3
+  dt: 0.01
+  mu: null
+
+food:
+  mode: "fixed"
+  n_food: 3
+  fixed_level_probs:
+    2: 0.6
+    3: 0.4
+  coupled_concentration: 0.7
+
+preprocess:
+  agent_feat_dim: 3
+  food_feat_dim: 3
+  obs_dim: 12
+
+model:
+  action_dim: 6
+  hidden_dim: 100
+  type_dim: 100
+  n_gnn_layers: 2
+  pairwise_rank: 5
+
+training:
+  mode: "online"
+  n_episodes: 25600            # 20% of paper 128k
+  n_envs: 16
+  lr: 2.5e-4
+  gamma: 0.99
+  t_update: 4
+  t_targ_update: 1
+  polyak_tau: 1.0e-3
+  grad_clip: 10.0
+
+epsilon:
+  init: 1.0
+  final: 0.05
+  decay_steps: 960000          # 0.2 × 4_800_000
+  decay_episodes: 300          # 0.2 × 1500 (fallback)
+
+variant: "GPL-Q"
+tau: null
+
+spi:
+  init_temp: 1.0
+  final_temp: 0.01
+  anneal_method: "linear"
+  anneal_episodes: 1500
+
+eval:
+  eval_every: 50
+  eval_episodes: 5
+  save_every: 50
+
+drift_eval:
+  n_episodes: 50
+  n_seeds: 5
+  stability_threshold: 0.10
+  primary_metric: "iqm_return"
+
+logging:
+  wandb_project: "open-aht-drift"
+  wandb_group: "gpl-lbf-train-03-episodes-20pct"
+  tensorboard: true
+  log_dir: "runs/gpl_lbf_train_03_episodes_20pct"
+  results_dir: "results/gpl_lbf_train_03_episodes_20pct"
+
+seed: 42

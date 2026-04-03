@@ -257,7 +257,7 @@ Two modes of operation:
 
 ```bash
 # Single point (default: sigma=0.1, theta=0.15)
-python experiments/eval_drift.py --checkpoint results/gpl_lbf/checkpoints/gpl_final.pt
+python experiments/eval_drift.py --checkpoint results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt
 
 # Custom sigma/theta
 python experiments/eval_drift.py --checkpoint path.pt --sigma 0.2 --theta 0.3

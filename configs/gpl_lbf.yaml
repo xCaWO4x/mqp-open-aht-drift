@@ -1,6 +1,10 @@
 # GPL training configuration for Level-Based Foraging
 # Hyperparameters aligned with Rahman et al. 2023 GPL source code
 # (Open_Experiments/LBF/GPL-Q/)
+#
+# LABEL: GPL_LBF_TRAIN_01 — paper episode budget (128k ep, 16 envs) + paper ε decay
+# Shorter Slurm presets: configs/gpl_lbf_train_02_episodes_50pct.yaml,
+#                         configs/gpl_lbf_train_03_episodes_20pct.yaml
 
 # --- Environment ---
 env:
@@ -104,10 +108,10 @@ drift_eval:
 # --- Logging ---
 logging:
   wandb_project: "open-aht-drift"
-  wandb_group: "gpl-lbf"
+  wandb_group: "gpl-lbf-train-01-paper-full"
   tensorboard: true
-  log_dir: "runs/gpl_lbf"
-  results_dir: "results/gpl_lbf"
+  log_dir: "runs/gpl_lbf_train_01_paper_full"
+  results_dir: "results/gpl_lbf_train_01_paper_full"
   # Per-episode: target_distribution, realized_composition, agent_levels,
   # food_levels, mean_agent_level, total_team_capability, mean_food_level
 
