@@ -18,8 +18,8 @@ Key design choices from the paper:
   - Between timesteps, type vectors of departed agents are removed and new
     vectors are added for newly-arrived agents (openness handling).
 
-# TODO: Preprocessing/postprocessing details from Appendix C.1
-#       (how B_t is constructed from raw state s_t, agent tracking, etc.)
+B_t construction and hidden-state management (Appendix C.1) are handled
+by preprocess_lbf() in envs/env_utils.py.
 """
 
 import torch

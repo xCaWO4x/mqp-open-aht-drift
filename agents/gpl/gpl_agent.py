@@ -26,8 +26,8 @@ Algorithm 5 training loop (synchronous, per-timestep):
 Also supports replay-buffer-based training via update() for experience
 replay variants (noted as straightforward in Appendix A).
 
-# TODO: PREPROCESS function from Appendix C.1
-#       (B_t construction, hidden vector management for open agent sets)
+PREPROCESS (Appendix C.1) is implemented in envs/env_utils.py.
+
 # TODO: Partial observability via D.3 autoencoder (ρ_t = MLP_α(c_t))
 """
 
