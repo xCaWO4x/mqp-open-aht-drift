@@ -365,7 +365,10 @@ class GPLAgent:
     def act(self, B_t, learner_idx=0, epsilon=0.0):
         """Select an action via ε-greedy over Q̄.
 
-        Updates internal hidden states (Alg. 5 line 27).
+        Does NOT update internal hidden states — train_step_online is the sole
+        updater of hidden states (Alg. 5 line 27).  This ensures QJOINT and
+        QV in the training step both start from the same h_{t-1}, matching
+        Algorithm 5 lines 11 and 14 which both receive h_Q (pre-step hidden).
 
         Parameters
         ----------
@@ -378,19 +381,11 @@ class GPLAgent:
         action : int
         """
         if np.random.random() < epsilon:
-            # Still need to advance LSTM states even on random actions
-            with torch.no_grad():
-                B_t_tensor = torch.FloatTensor(B_t).to(self.device)
-                _, self._hidden_q, self._hidden_agent = self.compute_qv(
-                    B_t_tensor, learner_idx
-                )
             return np.random.randint(self.action_dim)
 
         with torch.no_grad():
             B_t_tensor = torch.FloatTensor(B_t).to(self.device)
-            q_bar, self._hidden_q, self._hidden_agent = self.compute_qv(
-                B_t_tensor, learner_idx
-            )
+            q_bar, _, _ = self.compute_qv(B_t_tensor, learner_idx)
             return int(q_bar.argmax().item())
 
     # ------------------------------------------------------------------
@@ -445,11 +440,19 @@ class GPLAgent:
         )
 
         # ---- Line 15: QV(s', target params, h_Q^targ, h'_q) ----
+        # First advance target hidden through current obs s_t (same as online),
+        # then use the advanced hidden to compute Q' for s_{t+1}.
         with torch.no_grad():
+            _, h_q_targ_at_t, h_ag_at_t = self.compute_qv(
+                B_t_t, learner_idx,
+                hidden_q=self._hidden_q_target,
+                hidden_agent=self._hidden_agent,
+                use_target_q=True,
+            )
             q_bar_next, h_q_targ_new, _ = self.compute_qv(
                 B_next_t, learner_idx,
-                hidden_q=self._hidden_q_target,
-                hidden_agent=self._hidden_agent,  # h'_q from current step
+                hidden_q=h_q_targ_at_t,
+                hidden_agent=h_ag_at_t,
                 use_target_q=True,
             )
 
@@ -510,10 +513,13 @@ class GPLAgent:
                 self.type_net_q_target.load_state_dict(self.type_net_q.state_dict())
 
         # ---- Line 27: Carry hidden states forward ----
+        # h_q_new: online Q-path after seeing B_t (one step forward from h_{t-1})
+        # h_ag_new: agent-model path after seeing B_t
+        # h_q_targ_at_t: TARGET Q-path after seeing B_t (advance target by one obs)
         with torch.no_grad():
             self._hidden_q = (h_q_new[0].detach(), h_q_new[1].detach())
             self._hidden_agent = (h_ag_new[0].detach(), h_ag_new[1].detach())
-            self._hidden_q_target = (h_q_targ_new[0].detach(), h_q_targ_new[1].detach())
+            self._hidden_q_target = (h_q_targ_at_t[0].detach(), h_q_targ_at_t[1].detach())
 
         # Reset hidden states on episode end
         if done:
@@ -630,6 +636,29 @@ class GPLAgent:
     # ------------------------------------------------------------------
     # Utilities
     # ------------------------------------------------------------------
+
+    def advance_hidden(self, B_t):
+        """Advance LSTM hidden states by one timestep without training.
+
+        Used during evaluation: act() no longer updates hidden states
+        (train_step_online is the sole updater during training), so evaluation
+        loops must call this after each step to keep the LSTM context current.
+
+        Parameters
+        ----------
+        B_t : np.ndarray, shape (N, obs_dim)
+        """
+        with torch.no_grad():
+            B_t_tensor = torch.FloatTensor(np.asarray(B_t)).to(self.device)
+            _, self._hidden_q, self._hidden_agent = self.compute_qv(B_t_tensor)
+            # Advance target hidden the same way using target type net
+            _, h_q_targ, _ = self.compute_qv(
+                B_t_tensor,
+                hidden_q=self._hidden_q_target,
+                hidden_agent=self._hidden_agent,
+                use_target_q=True,
+            )
+            self._hidden_q_target = (h_q_targ[0].detach(), h_q_targ[1].detach())
 
     @staticmethod
     def _soft_update(source: nn.Module, target: nn.Module, tau: float):

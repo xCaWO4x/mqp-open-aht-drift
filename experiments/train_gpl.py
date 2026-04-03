@@ -174,7 +174,10 @@ def evaluate(
                 obs, n_agents, n_food,
                 hidden_dim=hidden_dim, device=device,
             )
-            action = agent.act(B.cpu().numpy(), learner_idx=0, epsilon=0.0)
+            B_np = B.cpu().numpy()
+            action = agent.act(B_np, learner_idx=0, epsilon=0.0)
+            # Advance hidden states (act() no longer updates them)
+            agent.advance_hidden(B_np)
 
             joint_action = [rng.integers(0, 6) for _ in range(n_agents)]
             joint_action[0] = action
