@@ -55,23 +55,22 @@ class JointActionValueModel(nn.Module):
         self.pairwise_rank = pairwise_rank
 
         # MLP_β: (θ^j, θ^i) → Q^j(a | H_t) of shape (|A|,)        (Eq. 9)
-        # Input is concatenation of agent j's type and learner's type.
+        # Paper Figure 7(b): FC(70)→ReLU→FC(60)→FC(|A|)
         self.mlp_beta = nn.Sequential(
-            nn.Linear(type_dim * 2, hidden_dim),
+            nn.Linear(type_dim * 2, 70),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim),
+            nn.Linear(70, 60),
+            nn.Linear(60, action_dim),
         )
 
         # MLP_δ: (θ^j, θ^i) → matrix of shape (K, |A|)             (Eq. 10)
+        # Paper Figure 7(c): FC(70)→ReLU→FC(60)→FC(K×|A|)
         # Pairwise Q is computed as MLP_δ(j)^T MLP_δ(k) → (|A|, |A|).
         self.mlp_delta = nn.Sequential(
-            nn.Linear(type_dim * 2, hidden_dim),
+            nn.Linear(type_dim * 2, 70),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, pairwise_rank * action_dim),
+            nn.Linear(70, 60),
+            nn.Linear(60, pairwise_rank * action_dim),
         )
 
     def individual_q(self, theta_j, theta_i):

@@ -60,9 +60,13 @@ class TypeInferenceModel(nn.Module):
         self.hidden_dim = hidden_dim
         self.type_dim = type_dim
 
-        # Input projection: B_t (state features per agent) → LSTM input
-        # Paper uses B_t which contains current state info for each agent.
-        self.input_proj = nn.Linear(obs_dim, hidden_dim)
+        # Input projection: B_t → LSTM input
+        # Paper Figure 7(a): FC(100)→ReLU→FC(100)→LSTM(100)→ReLU
+        self.input_proj = nn.Sequential(
+            nn.Linear(obs_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+        )
 
         # Core LSTM (Eq. 7): processes one timestep at a time to allow
         # incremental updates and agent set changes between steps.
@@ -106,14 +110,17 @@ class TypeInferenceModel(nn.Module):
         else:
             h, c = hidden
 
-        # Input projection
-        x = torch.relu(self.input_proj(B_t))  # (N, hidden_dim)
+        # Input projection: FC→ReLU→FC
+        x = self.input_proj(B_t)  # (N, hidden_dim)
 
         # LSTM update (Eq. 7)
         h_new, c_new = self.lstm(x, (h, c))
 
+        # ReLU after LSTM (paper Figure 7(a))
+        h_activated = torch.relu(h_new)
+
         # Project hidden state to type embedding
-        type_emb = self.output_proj(h_new)  # (N, type_dim)
+        type_emb = self.output_proj(h_activated)  # (N, type_dim)
 
         return type_emb, (h_new, c_new)
 

@@ -3,13 +3,15 @@ GPL training on Level-Based Foraging.
 
 Trains GPL under a stationary uniform composition distribution (no drift)
 to establish the baseline performance. Uses Algorithm 5 (online synchronous
-training) from Rahman et al. 2023.
+training) from Rahman et al. 2023, with support for parallel environments
+matching the paper's 16-env synchronous data collection.
 
 Usage:
     python experiments/train_gpl.py
     python experiments/train_gpl.py --config configs/gpl_lbf.yaml
     python experiments/train_gpl.py --smoke-test          # 5 episodes, no logging
     python experiments/train_gpl.py --n-episodes 500      # override episode count
+    python experiments/train_gpl.py --n-envs 16           # parallel envs (paper default)
 """
 
 import argparse
@@ -19,6 +21,7 @@ import time
 
 import numpy as np
 import yaml
+from tqdm.auto import tqdm
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -60,7 +63,7 @@ def make_lbf_env(cfg: dict, seed: int = 0) -> ForagingEnv:
         max_food_level=np.full(n_food, K, dtype=int),
         sight=env_cfg.get("sight", grid),
         max_episode_steps=env_cfg["max_steps"],
-        force_coop=env_cfg.get("force_coop", True),
+        force_coop=env_cfg.get("force_coop", False),
     )
     env.np_random = np.random.default_rng(seed)
     return env
@@ -102,6 +105,39 @@ def inject_levels(env: ForagingEnv, agent_levels: list, food_levels: list):
 
 
 # ======================================================================
+# Gym/Gymnasium compatibility helpers
+# ======================================================================
+
+def _unpack_reset(reset_out):
+    """Handle gymnasium (obs, info) vs gym (obs) reset returns."""
+    if isinstance(reset_out, tuple) and len(reset_out) == 2 and isinstance(reset_out[1], dict):
+        return reset_out[0]
+    return reset_out
+
+
+def _unpack_step(step_out):
+    """Handle gymnasium 5-tuple vs gym 4-tuple step returns."""
+    if len(step_out) == 5:
+        obs, rewards, terminated, truncated, info = step_out
+        if isinstance(terminated, (list, tuple)):
+            done = all(terminated) or all(truncated)
+        else:
+            done = bool(terminated) or bool(truncated)
+    else:
+        obs, rewards, dones_out, info = step_out
+        if isinstance(dones_out, (list, tuple)):
+            done = all(dones_out)
+        else:
+            done = bool(dones_out)
+    # Extract scalar reward (learner = agent 0)
+    if isinstance(rewards, (list, tuple)):
+        reward = float(rewards[0])
+    else:
+        reward = float(rewards)
+    return obs, reward, done, info
+
+
+# ======================================================================
 # Evaluation
 # ======================================================================
 
@@ -126,11 +162,7 @@ def evaluate(
         food_levels = sample_food_levels(n_food, rng, food_probs)
         inject_levels(env, agent_levels, food_levels)
 
-        reset_out = env.reset()
-        if isinstance(reset_out, tuple) and len(reset_out) == 2 and isinstance(reset_out[1], dict):
-            obs, _ = reset_out
-        else:
-            obs = reset_out
+        obs = _unpack_reset(env.reset())
         agent.reset()
 
         ep_return = 0.0
@@ -144,37 +176,17 @@ def evaluate(
             )
             action = agent.act(B.cpu().numpy(), learner_idx=0, epsilon=0.0)
 
-            # All agents act: learner picks action, others use uniform random
             joint_action = [rng.integers(0, 6) for _ in range(n_agents)]
             joint_action[0] = action
 
-            step_out = env.step(joint_action)
-            if len(step_out) == 5:
-                next_obs, rewards, terminated, truncated, _ = step_out
-                if isinstance(terminated, (list, tuple)):
-                    done = all(terminated) or all(truncated)
-                else:
-                    done = bool(terminated) or bool(truncated)
-            else:
-                next_obs, rewards, dones_out, _ = step_out
-                if isinstance(dones_out, (list, tuple)):
-                    done = all(dones_out)
-                else:
-                    done = bool(dones_out)
-
-            if isinstance(rewards, (list, tuple)):
-                ep_return += float(rewards[0])
-            else:
-                ep_return += float(rewards)
-
+            obs, reward, done, _ = _unpack_step(env.step(joint_action))
+            ep_return += reward
             ep_len += 1
-            obs = next_obs
 
         returns.append(ep_return)
         lengths.append(ep_len)
 
     returns = np.array(returns)
-    # IQM: mean of the middle 50%
     q25, q75 = np.percentile(returns, [25, 75])
     mask = (returns >= q25) & (returns <= q75)
     iqm = returns[mask].mean() if mask.sum() > 0 else returns.mean()
@@ -188,11 +200,16 @@ def evaluate(
 
 
 # ======================================================================
-# Training loop — Algorithm 5 (online synchronous)
+# Training loop — Algorithm 5 with parallel environments
 # ======================================================================
 
 def train(cfg: dict, smoke_test: bool = False):
-    """Main training loop."""
+    """Main training loop with N parallel environments.
+
+    Paper: 16 parallel envs, synchronous data collection (A3C-style).
+    Each "parallel step" produces N transitions. Gradients accumulate
+    over t_update parallel steps before applying.
+    """
     # --- Config ---
     env_cfg = cfg["env"]
     types_cfg = cfg["types"]
@@ -209,29 +226,29 @@ def train(cfg: dict, smoke_test: bool = False):
     obs_dim = cfg["preprocess"]["obs_dim"]
     action_dim = model_cfg["action_dim"]
     hidden_dim = model_cfg["hidden_dim"]
+    max_steps = env_cfg["max_steps"]
+    n_envs = train_cfg.get("n_envs", 1)
     n_episodes = 5 if smoke_test else train_cfg["n_episodes"]
-    # Auto-detect best available device. CUDA is used on HPC clusters.
-    # MPS (Apple Silicon) is slower than CPU for online RL batch_size=1
-    # due to Metal command overhead on tiny batches — fall back to CPU there.
+
     if "device" in cfg:
         device = cfg["device"]
     elif torch.cuda.is_available():
         device = "cuda"
     else:
-        device = "cpu"   # MPS intentionally skipped: slower than CPU here
+        device = "cpu"
     print(f"Using device: {device}")
     seed = cfg.get("seed", 42)
 
     food_probs = food_cfg.get("fixed_level_probs", {2: 0.6, 3: 0.4})
-    # Convert YAML string keys to int if needed
     food_probs = {int(k): v for k, v in food_probs.items()}
 
     # --- RNG ---
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
 
-    # --- Environment ---
-    env = make_lbf_env(cfg, seed=seed)
+    # --- Parallel environments ---
+    envs = [make_lbf_env(cfg, seed=seed + i) for i in range(n_envs)]
+    eval_env = envs[0]  # reuse first env for evaluation
 
     # --- Agent ---
     agent = GPLAgent(
@@ -246,6 +263,7 @@ def train(cfg: dict, smoke_test: bool = False):
         tau=cfg.get("tau", None),
         t_update=train_cfg["t_update"],
         t_targ_update=train_cfg["t_targ_update"],
+        polyak_tau=train_cfg.get("polyak_tau", None),
         device=device,
     )
 
@@ -254,7 +272,7 @@ def train(cfg: dict, smoke_test: bool = False):
     if not smoke_test:
         logger = Logger(
             log_dir=log_cfg.get("log_dir", "runs/gpl_lbf"),
-            use_wandb=False,  # user can init wandb externally
+            use_wandb=False,
             use_tensorboard=log_cfg.get("tensorboard", True),
         )
 
@@ -263,151 +281,206 @@ def train(cfg: dict, smoke_test: bool = False):
     ckpt_dir = os.path.join(results_dir, "checkpoints")
     os.makedirs(ckpt_dir, exist_ok=True)
 
-    # --- Epsilon schedule ---
+    # --- Epsilon schedule (step-based, matching paper) ---
     eps_init = eps_cfg["init"]
     eps_final = eps_cfg["final"]
-    eps_decay = eps_cfg["decay_episodes"]
+    # Paper: epsilon decays over 4.8M env steps.
+    # Support both step-based and episode-based decay.
+    eps_decay_steps = eps_cfg.get("decay_steps", None)
+    eps_decay_episodes = eps_cfg.get("decay_episodes", 1500)
 
-    def get_epsilon(episode: int) -> float:
-        frac = min(episode / max(eps_decay, 1), 1.0)
+    def get_epsilon_by_step(step: int) -> float:
+        if eps_decay_steps is not None:
+            frac = min(step / max(eps_decay_steps, 1), 1.0)
+        else:
+            # Approximate: convert episodes to steps
+            approx_steps = eps_decay_episodes * max_steps * n_envs
+            frac = min(step / max(approx_steps, 1), 1.0)
         return eps_init + (eps_final - eps_init) * frac
+
+    # --- Per-env state ---
+    # Each env has: current obs, done flag, episode return, episode length,
+    # and LSTM hidden states (h_q, h_agent, h_q_target)
+    env_obs = [None] * n_envs
+    env_done = [True] * n_envs     # start as done to trigger initial reset
+    env_ep_return = [0.0] * n_envs
+    env_ep_len = [0] * n_envs
+    # Hidden states per env: (hidden_q, hidden_agent, hidden_q_target)
+    env_hidden = [(None, None, None)] * n_envs
 
     # --- Training ---
     print(f"Training GPL on LBF: {n_episodes} episodes, "
           f"K={K}, n_agents={n_agents}, n_food={n_food}, obs_dim={obs_dim}")
     print(f"Config: lr={train_cfg['lr']}, gamma={train_cfg['gamma']}, "
-          f"t_update={train_cfg['t_update']}, t_targ_update={train_cfg['t_targ_update']}")
+          f"t_update={train_cfg['t_update']}, t_targ_update={train_cfg['t_targ_update']}, "
+          f"n_envs={n_envs}")
 
-    all_returns = []
+    all_returns = []    # completed episode returns
+    global_step = 0
+    completed_episodes = 0
     t_start = time.time()
+    last_metrics = None
 
-    for episode in range(n_episodes):
-        epsilon = get_epsilon(episode)
+    pbar = tqdm(
+        total=n_episodes,
+        desc="GPL LBF",
+        unit="ep",
+        disable=smoke_test,
+    )
 
-        # Sample stationary composition for this episode
-        agent_levels = sample_stationary_composition(n_agents, K, rng)
-        food_levels = sample_food_levels(n_food, rng, food_probs)
-        inject_levels(env, agent_levels, food_levels)
+    while completed_episodes < n_episodes:
+        epsilon = get_epsilon_by_step(global_step)
 
-        reset_out = env.reset()
-        # Gymnasium returns (obs, info); gym returns just obs
-        if isinstance(reset_out, tuple) and len(reset_out) == 2 and isinstance(reset_out[1], dict):
-            obs, _ = reset_out
-        else:
-            obs = reset_out
-        agent.reset()
+        # --- Process all N envs for one step ---
+        for env_idx in range(n_envs):
+            if completed_episodes >= n_episodes:
+                break
 
-        ep_return = 0.0
-        ep_len = 0
-        done = False
-        last_metrics = None
+            # --- Auto-reset if episode ended ---
+            if env_done[env_idx]:
+                agent_levels = sample_stationary_composition(n_agents, K, rng)
+                food_levels = sample_food_levels(n_food, rng, food_probs)
+                inject_levels(envs[env_idx], agent_levels, food_levels)
 
-        while not done:
-            # PREPROCESS: raw obs -> B_t
+                env_obs[env_idx] = _unpack_reset(envs[env_idx].reset())
+                env_done[env_idx] = False
+                env_ep_return[env_idx] = 0.0
+                env_ep_len[env_idx] = 0
+                # Reset hidden states for this env
+                env_hidden[env_idx] = (None, None, None)
+
+            # --- Load this env's hidden states into agent ---
+            agent._hidden_q = env_hidden[env_idx][0]
+            agent._hidden_agent = env_hidden[env_idx][1]
+            agent._hidden_q_target = env_hidden[env_idx][2]
+
+            # --- PREPROCESS ---
+            obs = env_obs[env_idx]
             B, _, _ = preprocess_lbf(
                 obs, n_agents, n_food,
                 hidden_dim=hidden_dim, device=device,
             )
             B_np = B.cpu().numpy()
 
-            # Select action (epsilon-greedy)
+            # --- Action selection (epsilon-greedy) ---
             action = agent.act(B_np, learner_idx=0, epsilon=epsilon)
 
-            # Build joint action: learner at index 0, teammates random
+            # --- Joint action: learner at 0, teammates random ---
             joint_action = [rng.integers(0, action_dim) for _ in range(n_agents)]
             joint_action[0] = action
 
-            # Step environment
-            step_out = env.step(joint_action)
-            # Gymnasium step returns (obs, reward, terminated, truncated, info)
-            # Gym step returns (obs, reward, done, info)
-            if len(step_out) == 5:
-                next_obs, rewards, terminated, truncated, infos = step_out
-                # Per-agent terminated/truncated
-                if isinstance(terminated, (list, tuple)):
-                    done = all(terminated) or all(truncated)
-                else:
-                    done = bool(terminated) or bool(truncated)
-            else:
-                next_obs, rewards, dones, infos = step_out
-                if isinstance(dones, (list, tuple)):
-                    done = all(dones)
-                else:
-                    done = bool(dones)
+            # --- Step environment ---
+            next_obs, reward, done, _ = _unpack_step(
+                envs[env_idx].step(joint_action)
+            )
 
-            # Per-agent rewards → learner reward
-            if isinstance(rewards, (list, tuple)):
-                reward = float(rewards[0])
-            else:
-                reward = float(rewards)
-
-            # PREPROCESS next state
+            # --- PREPROCESS next state ---
             B_next, _, _ = preprocess_lbf(
                 next_obs, n_agents, n_food,
                 hidden_dim=hidden_dim, device=device,
             )
             B_next_np = B_next.cpu().numpy()
 
-            # Build joint action array for training
-            joint_action_arr = np.array(joint_action)
-
-            # Train step (Algorithm 5)
+            # --- Train step (Algorithm 5): accumulates gradients ---
             metrics = agent.train_step_online(
-                B_np, joint_action_arr, reward, B_next_np, done,
+                B_np, np.array(joint_action), reward, B_next_np, done,
                 learner_idx=0,
             )
             if metrics is not None:
                 last_metrics = metrics
 
-            ep_return += reward
-            ep_len += 1
-            obs = next_obs
-
-        all_returns.append(ep_return)
-
-        # --- Logging ---
-        if logger is not None:
-            logger.log_episode(episode, ep_return, ep_len, {
-                "epsilon": epsilon,
-                "mean_agent_level": float(np.mean(agent_levels)),
-            })
-            if last_metrics is not None:
-                logger.log_scalars("train", last_metrics, episode)
-
-        # --- Periodic eval ---
-        save_every = eval_cfg.get("save_every", 50)
-        eval_every = eval_cfg.get("eval_every", 50)
-
-        if (episode + 1) % eval_every == 0 or episode == n_episodes - 1:
-            eval_result = evaluate(
-                agent, env, eval_cfg.get("eval_episodes", 5),
-                n_agents, n_food, K, rng, food_probs, hidden_dim, device,
+            # --- Save this env's hidden states ---
+            env_hidden[env_idx] = (
+                agent._hidden_q,
+                agent._hidden_agent,
+                agent._hidden_q_target,
             )
-            recent = all_returns[-min(50, len(all_returns)):]
-            elapsed = time.time() - t_start
-            eps_per_sec = (episode + 1) / elapsed if elapsed > 0 else 0
 
-            print(f"[Ep {episode+1:4d}/{n_episodes}] "
-                  f"train_avg={np.mean(recent):.3f} "
-                  f"eval_iqm={eval_result['iqm_return']:.3f} "
-                  f"eps={epsilon:.3f} "
-                  f"eps/s={eps_per_sec:.1f}")
+            # --- Update per-env episode tracking ---
+            env_ep_return[env_idx] += reward
+            env_ep_len[env_idx] += 1
+            env_obs[env_idx] = next_obs
+            env_done[env_idx] = done
+            global_step += 1
 
-            if logger is not None:
-                logger.log_scalars("eval", eval_result, episode)
+            # --- Episode completed ---
+            if done:
+                ep_return = env_ep_return[env_idx]
+                ep_len = env_ep_len[env_idx]
+                all_returns.append(ep_return)
+                completed_episodes += 1
+                pbar.update(1)
 
-        # --- Checkpoint ---
-        if (episode + 1) % save_every == 0:
-            path = os.path.join(ckpt_dir, f"gpl_ep{episode+1}.pt")
-            agent.save(path)
+                recent_n = min(50, len(all_returns))
+                train_avg = float(np.mean(all_returns[-recent_n:]))
+
+                if not smoke_test:
+                    pbar.set_postfix(
+                        ret=f"{ep_return:.2f}",
+                        avg50=f"{train_avg:.2f}",
+                        eps=f"{epsilon:.3f}",
+                        steps=global_step,
+                        refresh=False,
+                    )
+
+                # --- Logging ---
+                if logger is not None:
+                    logger.log_episode(completed_episodes - 1, ep_return, ep_len, {
+                        "epsilon": epsilon,
+                        "global_step": global_step,
+                    })
+                    if last_metrics is not None:
+                        logger.log_scalars("train", last_metrics, completed_episodes - 1)
+
+                # --- Periodic eval ---
+                save_every = eval_cfg.get("save_every", 50)
+                eval_every = eval_cfg.get("eval_every", 50)
+
+                if completed_episodes % eval_every == 0:
+                    # Save/restore agent hidden state for eval
+                    saved_hidden = (agent._hidden_q, agent._hidden_agent, agent._hidden_q_target)
+                    eval_result = evaluate(
+                        agent, eval_env, eval_cfg.get("eval_episodes", 5),
+                        n_agents, n_food, K, rng, food_probs, hidden_dim, device,
+                    )
+                    agent._hidden_q, agent._hidden_agent, agent._hidden_q_target = saved_hidden
+
+                    recent = all_returns[-min(50, len(all_returns)):]
+                    elapsed = time.time() - t_start
+                    eps_per_sec = completed_episodes / elapsed if elapsed > 0 else 0
+                    steps_per_sec = global_step / elapsed if elapsed > 0 else 0
+
+                    msg = (
+                        f"[Ep {completed_episodes:5d}/{n_episodes}] "
+                        f"train_avg={np.mean(recent):.3f} "
+                        f"eval_iqm={eval_result['iqm_return']:.3f} "
+                        f"eps={epsilon:.3f} "
+                        f"steps={global_step:,} "
+                        f"ep/s={eps_per_sec:.1f} "
+                        f"step/s={steps_per_sec:.0f}"
+                    )
+                    tqdm.write(msg)
+
+                    if logger is not None:
+                        logger.log_scalars("eval", eval_result, completed_episodes - 1)
+
+                # --- Checkpoint ---
+                if completed_episodes % save_every == 0:
+                    path = os.path.join(ckpt_dir, f"gpl_ep{completed_episodes}.pt")
+                    agent.save(path)
+
+    pbar.close()
 
     # Final checkpoint
     agent.save(os.path.join(ckpt_dir, "gpl_final.pt"))
 
     # Summary
     elapsed = time.time() - t_start
-    print(f"\nTraining complete: {n_episodes} episodes in {elapsed:.1f}s")
+    print(f"\nTraining complete: {completed_episodes} episodes, "
+          f"{global_step:,} env steps in {elapsed:.1f}s")
     print(f"Final avg return (last 50): {np.mean(all_returns[-50:]):.3f}")
+    print(f"Throughput: {completed_episodes/elapsed:.1f} ep/s, "
+          f"{global_step/elapsed:.0f} step/s")
 
     if logger is not None:
         logger.close()
@@ -426,10 +499,12 @@ def main():
                         help="Run 5 episodes with no logging for quick verification")
     parser.add_argument("--n-episodes", type=int, default=None,
                         help="Override number of training episodes")
+    parser.add_argument("--n-envs", type=int, default=None,
+                        help="Number of parallel environments (paper: 16)")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
         "--device", type=str, default=None,
-        help="Force device (cpu/mps/cuda). Default: cpu (fastest for online RL batch_size=1)",
+        help="Force device (cpu/mps/cuda).",
     )
     args = parser.parse_args()
 
@@ -438,6 +513,8 @@ def main():
 
     if args.n_episodes is not None:
         cfg["training"]["n_episodes"] = args.n_episodes
+    if args.n_envs is not None:
+        cfg["training"]["n_envs"] = args.n_envs
     if args.seed is not None:
         cfg["seed"] = args.seed
     if args.device is not None:
