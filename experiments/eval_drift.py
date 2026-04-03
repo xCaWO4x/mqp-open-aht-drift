@@ -6,7 +6,7 @@ Loads a trained GPLAgent, wraps LBF with DriftWrapper at specified
 and OU states. Computes IQM return and saves results + plots.
 
 Usage:
-    python experiments/eval_drift.py --checkpoint results/gpl_lbf/checkpoints/gpl_final.pt
+    python experiments/eval_drift.py --checkpoint results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt
     python experiments/eval_drift.py --checkpoint path.pt --sigma 0.2 --theta 0.15
     python experiments/eval_drift.py --checkpoint path.pt --sweep   # full (sigma, theta) grid
     python experiments/eval_drift.py --checkpoint path.pt --smoke-test

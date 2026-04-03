@@ -12,6 +12,7 @@ Usage:
     python experiments/train_gpl.py --smoke-test          # 5 episodes, no logging
     python experiments/train_gpl.py --n-episodes 500      # override episode count
     python experiments/train_gpl.py --n-envs 16           # parallel envs (paper default)
+    python experiments/train_gpl.py --eval-episodes 25    # stabler periodic eval IQM
 """
 
 import argparse
@@ -506,6 +507,10 @@ def main():
                         help="Number of parallel environments (paper: 16)")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
+        "--eval-episodes", type=int, default=None,
+        help="Override eval episodes per checkpoint (default from config).",
+    )
+    parser.add_argument(
         "--device", type=str, default=None,
         help="Force device (cpu/mps/cuda).",
     )
@@ -518,6 +523,8 @@ def main():
         cfg["training"]["n_episodes"] = args.n_episodes
     if args.n_envs is not None:
         cfg["training"]["n_envs"] = args.n_envs
+    if args.eval_episodes is not None:
+        cfg.setdefault("eval", {})["eval_episodes"] = args.eval_episodes
     if args.seed is not None:
         cfg["seed"] = args.seed
     if args.device is not None:
