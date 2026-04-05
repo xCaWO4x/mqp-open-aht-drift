@@ -19,17 +19,17 @@ The learner (agent 0) uses GPL; all teammates act randomly (standard open AHT pr
 
 ## Current state
 
-### Training: DONE
+### Training: DONE (paper 128k only)
 
-Three training runs completed on HPC (SLURM):
+One retained training run on HPC (SLURM); shorter-budget presets were removed from the repo layout.
 
 | Run | Episodes | Env steps | Train avg | Eval IQM | Checkpoint |
 |-----|----------|-----------|-----------|----------|------------|
-| 01 (paper) | 128,000 | 5,590,401 | 0.390 | 0.417 | `results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt` |
-| 02 (50%) | 64,000 | 2,895,299 | 0.376 | 0.259 | `results/gpl_lbf_train_02_episodes_50pct/checkpoints/gpl_final.pt` |
-| 03 (20%) | ~26,000 | ~1.2M | 0.045 | ~0 | `results/gpl_lbf_train_03_episodes_20pct/checkpoints/gpl_final.pt` |
+| Paper | 128,000 | 5,590,401 | 0.390 | 0.417 | `results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt` |
 
-The 128k result (0.390 avg, 0.417 IQM) is **in the paper's reported range** (~0.35-0.45 for GPL-Q with random teammates in 8x8-3p-3f no-force-coop). The 50% checkpoint is usable but weaker. The 20% checkpoint is undertrained (epsilon barely decayed).
+The 128k result (0.390 avg, 0.417 IQM) is **in the paper's reported range** (~0.35-0.45 for GPL-Q with random teammates in 8x8-3p-3f no-force-coop).
+
+**Artifact map:** see `docs/experiment_artifacts.md`.
 
 **Reward scale context:** In LBF, collecting a food item yields `food.level / max_food_level`. With food levels {2, 3} and max=3, expected reward per food = 0.8. Theoretical max (solo-load all 3 food) = 2.4. Practical ceiling with random teammates and varying agent levels is ~0.5-0.7. The 0.39-0.42 range means GPL collects ~55% of its fair share.
 
@@ -48,7 +48,7 @@ This runs `experiments/eval_drift.py --sweep` with the 128k checkpoint across a 
 - **100 episodes x 5 seeds** per grid point = 15,000 total episodes
 - Estimated runtime: ~1h on GPU, ~3-4h on CPU
 
-**Outputs** (in `results/drift_eval_sweep/`):
+**Outputs** (in `results/eval_drift_sweep_main/` by default):
 - `drift_eval_grid.csv` — sigma, theta, mean_return, iqm_return, degradation
 - `drift_eval_episodes.csv` — per-episode details (returns, agent/food levels, OU state)
 - `baseline_summary.txt` — baseline IQM and stability region count
@@ -85,9 +85,8 @@ open-aht-drift-clean/
       random_agent.py
   configs/
     gpl_lbf.yaml             # Training config (128k ep, 16 envs, paper hyperparams)
-    gpl_lbf_train_02_*.yaml  # 50% variant
-    gpl_lbf_train_03_*.yaml  # 20% variant
-    drift_sweep.yaml          # Sweep grid (6 sigma x 5 theta, 100 eps, 5 seeds)
+    drift_sweep.yaml          # Canonical eval drift grid
+    drift_sweep_bounds_*.yaml # Boundary sweeps for eval_drift
     gpl_wolfpack.yaml         # Future: Wolfpack config
   drift/
     ou_process.py             # OU process on K-simplex with Euclidean projection
@@ -105,12 +104,12 @@ open-aht-drift-clean/
     eval_drift.py             # Drift eval (single point + sweep, degradation, heatmaps)
     pilot_degradation.py      # Legacy pilot script (still uses RandomAgent)
   scripts/slurm/
-    gpl_lbf_train_01_paper_full.slurm
-    gpl_lbf_train_02_episodes_50pct.slurm
-    gpl_lbf_train_03_episodes_20pct.slurm
-    drift_eval_sweep.slurm    # ← Submit this for the drift eval
+    training_lbf_gpl_paper_128k.slurm   # paper training
+    submit_training_lbf_gpl_paper.sh
+    drift_eval_sweep.slurm              # canonical eval drift sweep
+    eval_drift_sweep_bounds_array.slurm # boundary sweeps (array 0–3)
     submit_drift_eval.sh
-    submit_gpl_lbf_three_presets.sh
+    submit_drift_eval_bounds.sh
   tests/
     test_gpl_forward.py       # 37 tests for GPL modules
     test_preprocess.py        # 13 tests for PREPROCESS (LBF + Wolfpack)

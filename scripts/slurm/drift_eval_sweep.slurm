@@ -30,8 +30,8 @@ conda activate "${MQP_CONDA_ENV:-drift-aht}"
 export PYTHONUNBUFFERED=1
 
 # Use the 128k (paper-full) checkpoint by default; override with DRIFT_CHECKPOINT env var
-CHECKPOINT="${DRIFT_CHECKPOINT:-results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt}"
-RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/drift_eval_sweep}"
+CHECKPOINT="${DRIFT_CHECKPOINT:-results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt}"
+RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/eval_drift_sweep_main}"
 
 echo "Checkpoint: ${CHECKPOINT}"
 echo "Results dir: ${RESULTS_DIR}"

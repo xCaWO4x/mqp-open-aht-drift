@@ -118,8 +118,7 @@ open-aht-drift/
 │   └── eval_drift.py           # drift evaluation: single-point + grid sweep ✓
 ├── configs/
 │   ├── gpl_lbf.yaml            # hyperparameters for GPL on LBF (paper-aligned)
-│   ├── gpl_lbf_train_02_episodes_50pct.yaml  # 50% episode budget preset
-│   ├── gpl_lbf_train_03_episodes_20pct.yaml  # 20% episode budget preset
+│   ├── drift_sweep*.yaml       # eval drift (sigma, theta) grids
 │   ├── gpl_wolfpack.yaml       # hyperparameters for GPL on Wolfpack
 │   └── drift_sweep.yaml        # (sigma, theta) grid for pilot experiment
 ├── scripts/slurm/              # Slurm job scripts for HPC training
@@ -258,7 +257,7 @@ Two modes of operation:
 
 ```bash
 # Single point (default: sigma=0.1, theta=0.15)
-python experiments/eval_drift.py --checkpoint results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt
+python experiments/eval_drift.py --checkpoint results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt
 
 # Custom sigma/theta
 python experiments/eval_drift.py --checkpoint path.pt --sigma 0.2 --theta 0.3

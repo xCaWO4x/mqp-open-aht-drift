@@ -15,6 +15,7 @@ build/
 results/
 runs/
 wandb/
+logs/
 
 # Environment
 .env

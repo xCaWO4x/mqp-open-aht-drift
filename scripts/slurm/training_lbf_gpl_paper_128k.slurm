@@ -1,6 +1,7 @@
 #!/bin/bash
-# LABEL: GPL_LBF_TRAIN_03 — 25.6k episodes (20% paper), ε decay 960k steps
-#SBATCH --job-name=gpl-lbf-03-20pct
+# Stationary LBF — GPL paper-length training (128k episodes, 16 envs).
+# Outputs: results/training_lbf_gpl_paper_128k/ (see docs/experiment_artifacts.md)
+#SBATCH --job-name=train-lbf-gpl-128k
 #SBATCH --account=xliu14
 #SBATCH --partition=long
 #SBATCH --nodes=1
@@ -9,7 +10,7 @@
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=RTX6000B
-#SBATCH --time=2-00:00:00
+#SBATCH --time=7-00:00:00
 #SBATCH --output=logs/slurm/%x-%j.out
 #SBATCH --error=logs/slurm/%x-%j.err
 
@@ -28,4 +29,4 @@ conda activate "${MQP_CONDA_ENV:-drift-aht}"
 
 export PYTHONUNBUFFERED=1
 nvidia-smi
-python -u experiments/train_gpl.py --config configs/gpl_lbf_train_03_episodes_20pct.yaml --device cuda
+python -u experiments/train_gpl.py --config configs/gpl_lbf.yaml --device cuda
