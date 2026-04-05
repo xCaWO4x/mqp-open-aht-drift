@@ -589,18 +589,29 @@ def main():
         "--results-dir", default=None,
         help="Override results directory",
     )
+    parser.add_argument(
+        "--food-mode", default=None, choices=["fixed", "coupled"],
+        help="Override food sampling mode from training config. "
+             "'coupled' scales food difficulty with agent levels, "
+             "isolating the non-stationarity effect from task difficulty.",
+    )
     args = parser.parse_args()
 
     # Load training config (for model architecture)
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
 
-    # Device: match evaluate_drift_point's logic
+    # Device (main): construct agent on CUDA when available
     if torch.cuda.is_available():
         device = "cuda"
     else:
         device = "cpu"
     print(f"Using device: {device}")
+
+    # Food-mode override (branch): required for --food-mode / coupled analyses
+    if args.food_mode is not None:
+        cfg["food"]["mode"] = args.food_mode
+        print(f"Food mode overridden to: {args.food_mode}")
 
     # Build and load agent
     model_cfg = cfg["model"]
