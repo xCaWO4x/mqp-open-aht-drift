@@ -1,7 +1,9 @@
 # Drift degradation sweep configuration
 # Grid of (sigma, theta) OU parameters to evaluate GPL robustness.
+# Canonical grid for eval_drift.py with --sweep-config configs/drift_sweep.yaml.
+# Boundary sweeps: configs/drift_sweep_bounds_*.yaml + eval_drift_sweep_bounds_array.slurm
 #
-# Designed for checkpoint: results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt
+# Default checkpoint: results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt
 # Baseline reference: sigma=0 row (stationary uniform composition, no drift).
 #
 # Note: env/model/food settings come from the TRAINING config (--config flag

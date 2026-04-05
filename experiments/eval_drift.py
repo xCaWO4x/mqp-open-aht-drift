@@ -9,7 +9,7 @@ stationary baseline (sigma=0 row in the sweep grid).
 Usage:
     # Full sweep (include sigma=0 in grid for baseline):
     python experiments/eval_drift.py \\
-        --checkpoint results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt \\
+        --checkpoint results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt \\
         --sweep
 
     # Single point:
@@ -226,6 +226,7 @@ def run_sweep(
     n_seeds: int,
     base_seed: int,
     results_dir: str,
+    stability_threshold: float = 0.10,
 ) -> dict:
     """Run full (sigma, theta) grid sweep across multiple seeds."""
     os.makedirs(results_dir, exist_ok=True)
@@ -260,7 +261,6 @@ def run_sweep(
     # --- Compute degradation relative to baseline (sigma=0 row if present) ---
     degradation = None
     baseline_iqm = None
-    stability_threshold = 0.10  # 10% default
 
     if 0.0 in sigmas:
         baseline_idx = sigmas.index(0.0)
@@ -631,6 +631,8 @@ def main():
         thetas = sweep_cfg["sweep"]["thetas"]
         n_episodes = args.n_episodes or sweep_cfg["eval"]["n_episodes"]
         n_seeds = sweep_cfg["eval"]["n_seeds"]
+        eval_block = sweep_cfg.get("eval", {})
+        stability_thr = float(eval_block.get("stability_threshold", 0.10))
         results_dir = args.results_dir or "results/drift_eval"
 
         if args.smoke_test:
@@ -642,6 +644,7 @@ def main():
         run_sweep(
             agent, cfg, sigmas, thetas,
             n_episodes, n_seeds, args.seed, results_dir,
+            stability_threshold=stability_thr,
         )
     else:
         # Single (sigma, theta) evaluation
