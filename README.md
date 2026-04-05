@@ -117,16 +117,17 @@ open-aht-drift/
 │   ├── train_gpl.py            # GPL training on LBF (Algorithm 5) ✓
 │   └── eval_drift.py           # drift evaluation: single-point + grid sweep ✓
 ├── configs/
-│   ├── gpl_lbf.yaml            # hyperparameters for GPL on LBF
+│   ├── gpl_lbf.yaml            # hyperparameters for GPL on LBF (paper-aligned)
+│   ├── gpl_lbf_train_02_episodes_50pct.yaml  # 50% episode budget preset
+│   ├── gpl_lbf_train_03_episodes_20pct.yaml  # 20% episode budget preset
 │   ├── gpl_wolfpack.yaml       # hyperparameters for GPL on Wolfpack
 │   └── drift_sweep.yaml        # (sigma, theta) grid for pilot experiment
-├── docs/
-│   └── research_proposal.md    # formalized research proposal with citations
+├── scripts/slurm/              # Slurm job scripts for HPC training
 ├── tests/
 │   ├── test_ou_process.py      # unit tests for OUProcess ✓ (11 tests)
-│   ├── test_drift_wrapper.py   # unit tests for DriftWrapper ✓ (6 tests)
+│   ├── test_drift_wrapper.py   # unit tests for DriftWrapper ✓ (23 tests)
 │   ├── test_gpl_forward.py     # GPL forward pass + training tests ✓ (36 tests)
-│   └── test_preprocess.py      # generic preprocess() + hidden state management ✓ (13 tests)
+│   └── test_preprocess.py      # preprocess + LBF/Wolfpack + hidden state ✓ (19 tests)
 ├── requirements.txt
 └── setup.py
 ```
@@ -295,14 +296,14 @@ conda activate drift-aht
 python -m pytest tests/ -v
 ```
 
-Expected output: **83 tests passing**.
+Expected output: **89 tests passing**.
 
 | Test file | Tests | What it checks |
 |-----------|-------|----------------|
 | `test_ou_process.py` | 11 | Simplex invariance, long-run mean convergence, variance scaling, input validation |
 | `test_drift_wrapper.py` | 23 | Food sampling (fixed/coupled), level injection, composition drift, food modes, episode summary |
 | `test_gpl_forward.py` | 36 | All GPL sub-modules: shapes, forward passes, training, persistence |
-| `test_preprocess.py` | 13 | Generic `preprocess()`: B_j=[x_j;u] construction, hidden state management. Note: `preprocess_lbf`/`preprocess_wolfpack` not yet covered. |
+| `test_preprocess.py` | 19 | Generic `preprocess()`, LBF/Wolfpack preprocessing, hidden state management |
 
 ---
 
