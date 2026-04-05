@@ -1,37 +1,21 @@
-# Pilot degradation sweep configuration
-# Grid of (sigma, theta) OU parameters to evaluate
-
-env:
-  grid_size: 8
-  n_agents: 3
-  n_food: 3
-  max_steps: 50
-  force_coop: false
-  sight: 8
-
-ou:
-  K: 3                # number of agent types (levels 1, 2, 3)
-  dt: 0.01
-  mu: null            # uniform by default
+# Drift degradation sweep configuration
+# Grid of (sigma, theta) OU parameters to evaluate GPL robustness.
+#
+# Designed for checkpoint: results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt
+# Baseline reference: sigma=0 row (stationary uniform composition, no drift).
+#
+# Note: env/model/food settings come from the TRAINING config (--config flag
+# in eval_drift.py). This file only specifies the sweep grid and eval settings.
 
 sweep:
-  sigmas: [0.01, 0.05, 0.1, 0.2, 0.5]
+  # sigma=0 row is the stationary baseline (no noise → composition stays uniform).
+  # Remaining rows probe increasing volatility at each mean-reversion speed.
+  sigmas: [0.0, 0.01, 0.05, 0.1, 0.2, 0.5]
   thetas: [0.05, 0.15, 0.3, 0.5, 1.0]
 
-food:
-  mode: "fixed"
-  n_food: 3
-  fixed_level_probs:
-    2: 0.6
-    3: 0.4
-
 eval:
-  n_episodes: 50      # episodes per (sigma, theta) grid point
+  n_episodes: 100     # episodes per (sigma, theta) grid point
   n_seeds: 5          # seeds for bootstrap CIs
-  stability_threshold: 0.10
+  stability_threshold: 0.10   # 10% IQM drop = "degraded"
   primary_metric: "iqm_return"
   seed: 42
-
-logging:
-  wandb_project: "open-aht-drift"
-  results_dir: "results/pilot"

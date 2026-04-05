@@ -30,7 +30,6 @@ import torch
 from lbforaging.foraging.environment import ForagingEnv
 
 from agents.gpl.gpl_agent import GPLAgent
-from agents.baselines.random_agent import RandomAgent
 from envs.env_utils import preprocess_lbf
 from eval.logger import Logger
 
@@ -153,6 +152,7 @@ def evaluate(
     food_probs: dict = None,
     hidden_dim: int = 100,
     device: str = "cpu",
+    action_dim: int = 6,
 ) -> dict:
     """Evaluate agent for n_episodes under stationary composition, no training."""
     returns = []
@@ -180,7 +180,7 @@ def evaluate(
             # Advance hidden states (act() no longer updates them)
             agent.advance_hidden(B_np)
 
-            joint_action = [rng.integers(0, 6) for _ in range(n_agents)]
+            joint_action = [rng.integers(0, action_dim) for _ in range(n_agents)]
             joint_action[0] = action
 
             obs, reward, done, _ = _unpack_step(env.step(joint_action))
@@ -446,6 +446,7 @@ def train(cfg: dict, smoke_test: bool = False):
                     eval_result = evaluate(
                         agent, eval_env, eval_cfg.get("eval_episodes", 5),
                         n_agents, n_food, K, rng, food_probs, hidden_dim, device,
+                        action_dim,
                     )
                     agent._hidden_q, agent._hidden_agent, agent._hidden_q_target = saved_hidden
 

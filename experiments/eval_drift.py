@@ -3,13 +3,20 @@ Evaluate a trained GPL checkpoint under OU-process composition drift.
 
 Loads a trained GPLAgent, wraps LBF with DriftWrapper at specified
 (sigma, theta) parameters, and records per-episode returns, compositions,
-and OU states. Computes IQM return and saves results + plots.
+and OU states. Computes IQM return and degradation relative to the
+stationary baseline (sigma=0 row in the sweep grid).
 
 Usage:
-    python experiments/eval_drift.py --checkpoint results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt
+    # Full sweep (include sigma=0 in grid for baseline):
+    python experiments/eval_drift.py \\
+        --checkpoint results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt \\
+        --sweep
+
+    # Single point:
     python experiments/eval_drift.py --checkpoint path.pt --sigma 0.2 --theta 0.15
-    python experiments/eval_drift.py --checkpoint path.pt --sweep   # full (sigma, theta) grid
-    python experiments/eval_drift.py --checkpoint path.pt --smoke-test
+
+    # Smoke test:
+    python experiments/eval_drift.py --checkpoint path.pt --sweep --smoke-test
 """
 
 import argparse
@@ -56,7 +63,7 @@ def make_lbf_env(cfg: dict, seed: int = 0) -> ForagingEnv:
         max_food_level=np.full(n_food, K, dtype=int),
         sight=env_cfg.get("sight", grid),
         max_episode_steps=env_cfg["max_steps"],
-        force_coop=env_cfg.get("force_coop", True),
+        force_coop=env_cfg.get("force_coop", False),
     )
     env.np_random = np.random.default_rng(seed)
     return env
@@ -100,10 +107,7 @@ def evaluate_drift_point(
     n_food = food_cfg["n_food"]
     hidden_dim = model_cfg["hidden_dim"]
     action_dim = model_cfg["action_dim"]
-    if torch.cuda.is_available():
-        device = "cuda"
-    else:
-        device = "cpu"   # MPS intentionally skipped: slower than CPU for inference here
+    device = str(agent.device)  # match the agent's device
 
     food_probs = food_cfg.get("fixed_level_probs", {2: 0.6, 3: 0.4})
     food_probs = {int(k): v for k, v in food_probs.items()}
@@ -253,12 +257,42 @@ def run_sweep(
         print(f"  sigma={sigma:.3f}, theta={theta:.3f}: "
               f"mean={mean_returns[i,j]:.4f}, iqm={iqm_returns[i,j]:.4f}")
 
-    # --- Save CSV ---
+    # --- Compute degradation relative to baseline (sigma=0 row if present) ---
+    degradation = None
+    baseline_iqm = None
+    stability_threshold = 0.10  # 10% default
+
+    if 0.0 in sigmas:
+        baseline_idx = sigmas.index(0.0)
+        # Baseline IQM: average across all theta columns at sigma=0
+        # (all should be ~identical since sigma=0 → no noise)
+        baseline_iqm = float(iqm_returns[baseline_idx, :].mean())
+        print(f"\nBaseline IQM (sigma=0, avg over thetas): {baseline_iqm:.4f}")
+
+        if baseline_iqm > 0:
+            degradation = np.zeros_like(iqm_returns)
+            for i in range(len(sigmas)):
+                for j in range(len(thetas)):
+                    degradation[i, j] = 1.0 - iqm_returns[i, j] / baseline_iqm
+            # Stability region: grid points with < threshold degradation
+            stable_mask = degradation < stability_threshold
+            n_stable = int(stable_mask.sum())
+            n_total = degradation.size
+            print(f"Stability region ({stability_threshold:.0%} threshold): "
+                  f"{n_stable}/{n_total} grid points stable")
+
+    # --- Save CSVs ---
     csv_path = os.path.join(results_dir, "drift_eval_grid.csv")
     with open(csv_path, "w") as f:
-        f.write("sigma,theta,mean_return,iqm_return\n")
+        header = "sigma,theta,mean_return,iqm_return"
+        if degradation is not None:
+            header += ",degradation"
+        f.write(header + "\n")
         for (i, sigma), (j, theta) in grid:
-            f.write(f"{sigma},{theta},{mean_returns[i,j]},{iqm_returns[i,j]}\n")
+            row = f"{sigma},{theta},{mean_returns[i,j]},{iqm_returns[i,j]}"
+            if degradation is not None:
+                row += f",{degradation[i,j]}"
+            f.write(row + "\n")
     print(f"\nGrid CSV saved to {csv_path}")
 
     # --- Save per-episode CSV ---
@@ -276,12 +310,30 @@ def run_sweep(
                         f"{al},{fl},{ou}\n")
     print(f"Episode CSV saved to {detail_path}")
 
-    # --- Heatmap ---
+    # --- Save baseline summary ---
+    if baseline_iqm is not None:
+        baseline_path = os.path.join(results_dir, "baseline_summary.txt")
+        with open(baseline_path, "w") as f:
+            f.write(f"baseline_iqm: {baseline_iqm:.6f}\n")
+            f.write(f"stability_threshold: {stability_threshold}\n")
+            if degradation is not None:
+                n_stable = int((degradation < stability_threshold).sum())
+                f.write(f"stable_points: {n_stable}/{degradation.size}\n")
+        print(f"Baseline summary saved to {baseline_path}")
+
+    # --- Heatmaps ---
     _save_heatmap(mean_returns, iqm_returns, sigmas, thetas, results_dir)
+    if degradation is not None:
+        _save_degradation_heatmap(
+            degradation, sigmas, thetas, baseline_iqm,
+            stability_threshold, results_dir,
+        )
 
     return {
         "mean_returns": mean_returns,
         "iqm_returns": iqm_returns,
+        "degradation": degradation,
+        "baseline_iqm": baseline_iqm,
         "all_results": all_results,
     }
 
@@ -320,6 +372,70 @@ def _save_heatmap(
         print(f"Heatmap saved to {plot_path}")
     except ImportError:
         print("[WARN] matplotlib not installed, skipping heatmap.")
+
+
+def _save_degradation_heatmap(
+    degradation: np.ndarray,
+    sigmas: list,
+    thetas: list,
+    baseline_iqm: float,
+    stability_threshold: float,
+    results_dir: str,
+):
+    """Save degradation heatmap with stability boundary contour."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import TwoSlopeNorm
+
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+
+        # Diverging colormap centered at 0: blue (improvement) → white → red (degradation)
+        vmax = max(abs(degradation.min()), abs(degradation.max()), 0.5)
+        norm = TwoSlopeNorm(vmin=-vmax, vcenter=0.0, vmax=vmax)
+
+        im = ax.imshow(
+            degradation, aspect="auto", origin="lower",
+            extent=[thetas[0], thetas[-1], sigmas[0], sigmas[-1]],
+            cmap="RdBu_r", norm=norm,
+        )
+        ax.set_xlabel(r"$\theta$ (mean-reversion rate)")
+        ax.set_ylabel(r"$\sigma$ (noise scale)")
+        ax.set_title(
+            f"GPL degradation under drift\n"
+            f"(baseline IQM={baseline_iqm:.3f}, "
+            f"threshold={stability_threshold:.0%})"
+        )
+        fig.colorbar(im, ax=ax, label="Fractional degradation (1 - IQM/baseline)")
+
+        # Overlay stability boundary contour
+        try:
+            theta_arr = np.array(thetas)
+            sigma_arr = np.array(sigmas)
+            cs = ax.contour(
+                theta_arr, sigma_arr, degradation,
+                levels=[stability_threshold],
+                colors="black", linewidths=2, linestyles="--",
+            )
+            ax.clabel(cs, fmt=f"{stability_threshold:.0%}", fontsize=10)
+        except Exception:
+            pass  # contour may fail with too few grid points
+
+        # Mark stable vs degraded cells
+        for i, sigma in enumerate(sigmas):
+            for j, theta in enumerate(thetas):
+                marker = "o" if degradation[i, j] < stability_threshold else "x"
+                color = "green" if degradation[i, j] < stability_threshold else "red"
+                # Map grid indices to plot coordinates
+                ax.plot(theta, sigma, marker, color=color, markersize=6, alpha=0.7)
+
+        plot_path = os.path.join(results_dir, "drift_degradation_heatmap.png")
+        fig.savefig(plot_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Degradation heatmap saved to {plot_path}")
+    except ImportError:
+        print("[WARN] matplotlib not installed, skipping degradation heatmap.")
 
 
 # ======================================================================
@@ -479,6 +595,13 @@ def main():
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
 
+    # Device: match evaluate_drift_point's logic
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+    print(f"Using device: {device}")
+
     # Build and load agent
     model_cfg = cfg["model"]
     agent = GPLAgent(
@@ -494,7 +617,7 @@ def main():
         t_update=cfg["training"]["t_update"],
         t_targ_update=cfg["training"]["t_targ_update"],
         polyak_tau=cfg["training"].get("polyak_tau", None),
-        device="cpu",
+        device=device,
     )
     agent.load(args.checkpoint)
     print(f"Loaded checkpoint: {args.checkpoint}")
