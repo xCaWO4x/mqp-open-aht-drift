@@ -33,6 +33,10 @@ This document maps **on-disk layout** under `results/` (gitignored), **Slurm job
 
 All eval runs load **`gpl_final.pt`** (or override `DRIFT_CHECKPOINT`) and use **`configs/gpl_lbf.yaml`** for model/env shape.
 
+### Local ad-hoc (CLI default)
+
+If you run `experiments/eval_drift.py` without `--results-dir`, outputs go to **`results/drift_eval/`**. That is **not** the Slurm sweep layout; use it for one-off checks.
+
 ### Canonical grid (`configs/drift_sweep.yaml`)
 
 | Item | Location |
