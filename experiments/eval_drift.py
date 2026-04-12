@@ -17,13 +17,16 @@ Usage:
 
     # Smoke test:
     python experiments/eval_drift.py --checkpoint path.pt --sweep --smoke-test
+
+    # Sweep YAML may include optional top-level `ou:` (e.g. dt) merged into training config.
 """
 
 import argparse
+import copy
+import itertools
 import os
 import sys
 import time
-import itertools
 
 import numpy as np
 import yaml
@@ -646,6 +649,15 @@ def main():
         stability_thr = float(eval_block.get("stability_threshold", 0.10))
         results_dir = args.results_dir or "results/drift_eval"
 
+        # Merge optional `ou:` block from sweep YAML into config (eval only).
+        cfg_sweep = copy.deepcopy(cfg)
+        ou_over = sweep_cfg.get("ou")
+        if ou_over:
+            base_ou = dict(cfg_sweep.get("ou", {}))
+            base_ou.update(ou_over)
+            cfg_sweep["ou"] = base_ou
+            print(f"Sweep config overrides ou: {ou_over}")
+
         if args.smoke_test:
             n_episodes = 3
             n_seeds = 1
@@ -653,7 +665,7 @@ def main():
             thetas = thetas[:2]
 
         run_sweep(
-            agent, cfg, sigmas, thetas,
+            agent, cfg_sweep, sigmas, thetas,
             n_episodes, n_seeds, args.seed, results_dir,
             stability_threshold=stability_thr,
         )

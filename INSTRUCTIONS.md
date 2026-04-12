@@ -57,6 +57,14 @@ This runs `experiments/eval_drift.py --sweep` with the 128k checkpoint across a 
 
 **Degradation is computed as** `1 - IQM / baseline_IQM` where baseline is the sigma=0 row (stationary uniform composition). A grid point is "stable" if degradation < 10%.
 
+**Extended diffusion sweeps** (higher σ, **new** result directories — canonical `eval_drift_sweep_main/` unchanged):
+
+```bash
+bash scripts/slurm/submit_drift_eval_extended.sh
+```
+
+Submits three jobs: `drift_sweep_extended.yaml` → `results/eval_drift_sweep_main_extended/`, coupled extended → `results/eval_drift_sweep_coupled_extended/`, and `drift_sweep_extended_dt.yaml` (`ou.dt=0.1`) → `results/eval_drift_sweep_main_extended_dt/`. Grid is **10×5** σ×θ (adds σ ∈ {1.0, 1.5, 2.0, 3.0}). Details: **`docs/experiment_artifacts.md`**.
+
 ---
 
 ## Key architecture decisions (locked)
@@ -86,6 +94,7 @@ open-aht-drift-clean/
   configs/
     gpl_lbf.yaml             # Training config (128k ep, 16 envs, paper hyperparams)
     drift_sweep.yaml          # Canonical eval drift grid
+    drift_sweep_extended.yaml # Extended σ tail (+ coupled / + dt variants)
     drift_sweep_bounds_*.yaml # Boundary sweeps for eval_drift
     gpl_wolfpack.yaml         # Future: Wolfpack config
   drift/
@@ -107,6 +116,8 @@ open-aht-drift-clean/
     training_lbf_gpl_paper_128k.slurm   # paper training
     submit_training_lbf_gpl_paper.sh
     drift_eval_sweep.slurm              # canonical eval drift sweep
+    drift_eval_sweep_extended*.slurm    # extended σ (+ coupled / dt ablation)
+    submit_drift_eval_extended.sh
     eval_drift_sweep_bounds_array.slurm # boundary sweeps (array 0–3)
     submit_drift_eval.sh
     submit_drift_eval_bounds.sh

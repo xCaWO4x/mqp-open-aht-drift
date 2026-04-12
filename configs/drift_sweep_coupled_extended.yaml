@@ -1,0 +1,17 @@
+# Extended sweep with COUPLED food (same σ, θ grid as drift_sweep_extended.yaml).
+#
+# Canonical coupled sweep: drift_sweep_coupled.yaml → results/eval_drift_sweep_coupled/
+# This run: results/eval_drift_sweep_coupled_extended/
+#
+# Slurm: scripts/slurm/drift_eval_sweep_coupled_extended.slurm
+
+sweep:
+  sigmas: [0.0, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 1.5, 2.0, 3.0]
+  thetas: [0.05, 0.15, 0.3, 0.5, 1.0]
+
+eval:
+  n_episodes: 100
+  n_seeds: 5
+  stability_threshold: 0.10
+  primary_metric: "iqm_return"
+  seed: 42

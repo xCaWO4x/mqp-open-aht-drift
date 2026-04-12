@@ -45,6 +45,60 @@ If you run `experiments/eval_drift.py` without `--results-dir`, outputs go to **
 | **Slurm** | `scripts/slurm/drift_eval_sweep.slurm` |
 | **Submit** | `scripts/slurm/submit_drift_eval.sh` |
 
+**σ values:** `[0, 0.01, 0.05, 0.1, 0.2, 0.5]` — same baseline row (σ=0) as the original paper-style stationary reference. These directories are **left in place** for comparison when you run extended sweeps.
+
+### Extended diffusion sweeps (higher σ, separate result dirs)
+
+Use these to probe **where performance breaks** without overwriting canonical CSVs.
+
+| Variant | Sweep YAML | Results directory | Slurm script |
+|--------|------------|-------------------|--------------|
+| Fixed food, **extended σ** | `configs/drift_sweep_extended.yaml` | `results/eval_drift_sweep_main_extended/` | `drift_eval_sweep_extended.slurm` |
+| Coupled food, **extended σ** | `configs/drift_sweep_coupled_extended.yaml` | `results/eval_drift_sweep_coupled_extended/` | `drift_eval_sweep_coupled_extended.slurm` |
+| Fixed food, extended σ + **`ou.dt=0.1`** | `configs/drift_sweep_extended_dt.yaml` | `results/eval_drift_sweep_main_extended_dt/` | `drift_eval_sweep_extended_dt.slurm` |
+
+**Extended σ list** (includes all canonical values plus a tail):  
+`[0, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 1.5, 2.0, 3.0]`  
+**θ** unchanged vs canonical: `[0.05, 0.15, 0.3, 0.5, 1.0]`.
+
+**Submit all three** (recommended on cluster):
+
+```bash
+bash scripts/slurm/submit_drift_eval_extended.sh
+```
+
+Each job is **10 × 5 × 100 × 5 = 25,000** episodes (vs **15,000** for the canonical 6×5 grid).
+
+#### OU scaling (why σ and `dt` both matter)
+
+Discrete OU step in `drift/ou_process.py`:
+
+\[
+\mathbf{x} \leftarrow \mathbf{x} + \theta(\boldsymbol{\mu}-\mathbf{x})\,\Delta t + \sigma\sqrt{\Delta t}\,\boldsymbol{\xi}
+\]
+
+Then project onto the simplex. **Innovation RMS** scales as **σ√Δt** (per coordinate, before projection).
+
+| Setting | Typical Δt | Effective innovation scale (×σ) |
+|--------|------------|----------------------------------|
+| Training / canonical eval | `0.01` from `configs/gpl_lbf.yaml` | **√0.01 = 0.1** |
+| `drift_sweep_extended_dt.yaml` | `0.1` | **√0.1 ≈ 0.316** |
+
+Sweep YAML may include an optional top-level **`ou:`** block; keys are merged into the training config **for that sweep only** (see `experiments/eval_drift.py`).
+
+#### Capability-confound reports (extended grids)
+
+After sweeps finish:
+
+```bash
+python experiments/analyze_capability_confound.py \
+  --episodes-csv results/eval_drift_sweep_main_extended/drift_eval_episodes.csv \
+  --out-dir results/capability_confound_main_extended
+# likewise: capability_confound_coupled_extended, capability_confound_main_extended_dt
+```
+
+**Observed outcome (representative run):** fixed-food **extended** (`dt=0.01`) stayed mostly stable vs baseline (**47/50** cells with degradation below 10%); **larger `dt`** produced many unstable cells (**33/50**) especially at σ ∈ {2, 3} and some at σ=0.01. Coupled extended had **50/50** stable on that metric. Interpretation: pushing **effective simplex mobility** (`dt`) hurts more than pushing **σ alone** on this checkpoint; coupled food removes sharp **IQM drops vs baseline** even at high σ.
+
 ### Boundary sweeps (array tasks 0–3)
 
 | Task | YAML | Results directory |
@@ -92,7 +146,7 @@ python scripts/plot_drift_degradation.py
 
 ### Primary table
 
-Use **`results/eval_drift_sweep_<variant>/drift_eval_episodes.csv`**.
+Use **`results/eval_drift_sweep_<variant>/drift_eval_episodes.csv`** (e.g. `_main`, `_coupled`, or extended variants: `_main_extended`, `_coupled_extended`, `_main_extended_dt`).
 
 | Column | Use |
 |--------|-----|
@@ -140,3 +194,16 @@ Slurm **stdout/stderr** live under **`logs/slurm/`** (untracked). Filenames incl
 ## What is *not* stored in git
 
 - **`results/`**, **`runs/`**, **`logs/`**, **`wandb/`** are **gitignored**. Reproduce locally or on the cluster using the configs and Slurm scripts above.
+- **Training dumps** (checkpoints, episode buffers, TensorBoard) live under `results/training_*` and `runs/` — **do not delete** them when pushing code; they are excluded from the remote by design so the repo stays clone-friendly.
+
+### Copying artifacts to another machine (optional)
+
+From the repo root (after a sweep or training run):
+
+```bash
+rsync -a --progress results/training_lbf_gpl_paper_128k/ user@host:path/to/backup/training_lbf_gpl_paper_128k/
+rsync -a --progress results/eval_drift_sweep_main_extended/ user@host:path/to/backup/
+rsync -a --progress logs/slurm/ user@host:path/to/backup/slurm-logs/
+```
+
+Git branches carry **configs, Slurm, and docs only**; bundle `results/` and `logs/` separately when archiving a paper snapshot.
