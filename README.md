@@ -285,9 +285,9 @@ Default sweep configuration:
 | Environment | LBF 8x8, 3 agents, 3 food, force_coop=True |
 | Agent types (K) | 3 (levels 1, 2, 3) |
 | Food mode | "fixed" — levels from {2: 0.6, 3: 0.4} |
-| Sigmas | 0.01, 0.05, 0.1, 0.2, 0.5 |
+| Sigmas | 0, 0.01, 0.05, 0.1, 0.2, 0.5 (σ=0 baseline) |
 | Thetas | 0.05, 0.15, 0.3, 0.5, 1.0 |
-| Episodes per grid point | 50 |
+| Episodes per grid point | 100 |
 | Seeds | 5 (bootstrap CIs) |
 | Max steps per episode | 200 |
 | Stability threshold | 10% degradation |
