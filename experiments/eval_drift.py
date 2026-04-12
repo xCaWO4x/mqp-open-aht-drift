@@ -67,6 +67,7 @@ def make_lbf_env(cfg: dict, seed: int = 0) -> ForagingEnv:
         sight=env_cfg.get("sight", grid),
         max_episode_steps=env_cfg["max_steps"],
         force_coop=env_cfg.get("force_coop", False),
+        observe_agent_levels=env_cfg.get("observe_agent_levels", True),
     )
     env.np_random = np.random.default_rng(seed)
     return env
@@ -115,6 +116,7 @@ def evaluate_drift_point(
     food_probs = food_cfg.get("fixed_level_probs", {2: 0.6, 3: 0.4})
     food_probs = {int(k): v for k, v in food_probs.items()}
     food_mode = food_cfg.get("mode", "fixed")
+    observe_agent_levels = env_cfg.get("observe_agent_levels", True)
 
     rng = np.random.default_rng(seed)
 
@@ -156,6 +158,7 @@ def evaluate_drift_point(
             B, _, _ = preprocess_lbf(
                 obs, n_agents, n_food,
                 hidden_dim=hidden_dim, device=device,
+                observe_agent_levels=observe_agent_levels,
             )
             B_np = B.cpu().numpy()
             # Greedy action (no exploration)

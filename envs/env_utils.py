@@ -150,23 +150,29 @@ def preprocess_lbf(
     prev_hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
     hidden_dim: int = 128,
     device: str = "cpu",
+    observe_agent_levels: bool = True,
 ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor], List[int]]:
     """PREPROCESS specialised for Level-Based Foraging.
 
     LBF returns a tuple of per-agent ego-centric observations.
-    Each agent's obs is: [food(3 each), self(3), other_agents(3 each)].
+    Each agent's obs is: [food(3 each), self(feat_dim), other_agents(feat_dim each)].
     Food features come FIRST, then agent features (self first among agents).
 
+    When observe_agent_levels=True (default):
+        agent features = (y, x, level) → 3 per agent
+    When observe_agent_levels=False:
+        agent features = (y, x) → 2 per agent (level is dropped by LBF)
+
     We reconstruct the global state and produce:
-        x_j = agent j's (y, x, level) = 3 features
+        x_j = agent j's features (2 or 3 dims)
         u   = food features = 3 * n_food features
-        B_j = [x_j ; u]    (obs_dim = 3 + 3 * n_food)
+        B_j = [x_j ; u]    (obs_dim = agent_feat_dim + 3 * n_food)
 
     Parameters
     ----------
     raw_obs : tuple/list of arrays
-        Per-agent observations from LBF. Each shape (3*n_food + 3*n_agents,).
-        Format: [food_0(3), ..., food_m(3), self(3), other_0(3), ..., other_n(3)]
+        Per-agent observations from LBF.
+        Format: [food_0(3), ..., food_m(3), self(feat), other_0(feat), ...]
         OR a single flat array (already global state).
     n_agents : int
         Number of agents in the environment.
@@ -178,16 +184,21 @@ def preprocess_lbf(
         Previous LSTM hidden states.
     hidden_dim : int
     device : str
+    observe_agent_levels : bool
+        Whether LBF was configured with observe_agent_levels=True.
+        Determines per-agent feature dimension (3 vs 2).
 
     Returns
     -------
-    B : Tensor, shape (n_agents, 3 + 3*n_food)
+    B : Tensor, shape (n_agents, agent_feat_dim + 3*n_food)
     hidden : tuple of (h, c) each shape (n_agents, hidden_dim)
     agent_ids : list of int
     """
+    agent_feat_dim = LBF_AGENT_FEAT_DIM if observe_agent_levels else 2
+
     if isinstance(raw_obs, (list, tuple)):
         # Multi-agent obs: reconstruct global state from ego-centric views.
-        # LBF obs format: [food(3*n_food), self(3), others(3*(n_agents-1))]
+        # LBF obs format: [food(3*n_food), self(agent_feat_dim), others(agent_feat_dim*(n_agents-1))]
         # Food comes FIRST, then agents (self first among agents).
         #
         # Strategy: extract each agent's own features from their ego obs,
@@ -196,17 +207,17 @@ def preprocess_lbf(
         food_end = n_food * LBF_FOOD_FEAT_DIM
         agent_start = food_end  # agents start right after food
 
-        agent_features = []   # list of (y, x, level) per agent
+        agent_features = []   # list of (y, x[, level]) per agent
         for i in range(n_agents):
             obs_i = np.asarray(raw_obs[i], dtype=np.float32)
             # Self agent features start at food_end (first among agents)
-            agent_features.append(obs_i[agent_start:agent_start + LBF_AGENT_FEAT_DIM])
+            agent_features.append(obs_i[agent_start:agent_start + agent_feat_dim])
 
         # Food features from agent 0 (same positions for all, may differ in order)
         obs_0 = np.asarray(raw_obs[0], dtype=np.float32)
         food_features = obs_0[:food_end]
 
-        # Build a flat global state: [agent_0(3), agent_1(3), ..., food(3*n_food)]
+        # Build a flat global state: [agent_0(feat), agent_1(feat), ..., food(3*n_food)]
         global_state = np.concatenate(agent_features + [food_features])
     else:
         # Already a flat global state
@@ -216,10 +227,10 @@ def preprocess_lbf(
     agent_feature_slices = {}
     curr_agent_ids = list(range(n_agents))
     for i in range(n_agents):
-        start = i * LBF_AGENT_FEAT_DIM
-        agent_feature_slices[i] = slice(start, start + LBF_AGENT_FEAT_DIM)
+        start = i * agent_feat_dim
+        agent_feature_slices[i] = slice(start, start + agent_feat_dim)
 
-    shared_feature_slice = slice(n_agents * LBF_AGENT_FEAT_DIM, len(global_state))
+    shared_feature_slice = slice(n_agents * agent_feat_dim, len(global_state))
 
     return preprocess(
         global_state, agent_feature_slices, shared_feature_slice,

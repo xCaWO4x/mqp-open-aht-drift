@@ -64,6 +64,7 @@ def make_lbf_env(cfg: dict, seed: int = 0) -> ForagingEnv:
         sight=env_cfg.get("sight", grid),
         max_episode_steps=env_cfg["max_steps"],
         force_coop=env_cfg.get("force_coop", False),
+        observe_agent_levels=env_cfg.get("observe_agent_levels", True),
     )
     env.np_random = np.random.default_rng(seed)
     return env
@@ -174,6 +175,7 @@ def evaluate(
             B, _, _ = preprocess_lbf(
                 obs, n_agents, n_food,
                 hidden_dim=hidden_dim, device=device,
+                observe_agent_levels=observe_agent_levels,
             )
             B_np = B.cpu().numpy()
             action = agent.act(B_np, learner_idx=0, epsilon=0.0)
@@ -231,6 +233,7 @@ def train(cfg: dict, smoke_test: bool = False):
     action_dim = model_cfg["action_dim"]
     hidden_dim = model_cfg["hidden_dim"]
     max_steps = env_cfg["max_steps"]
+    observe_agent_levels = env_cfg.get("observe_agent_levels", True)
     n_envs = train_cfg.get("n_envs", 1)
     n_episodes = 5 if smoke_test else train_cfg["n_episodes"]
 
@@ -363,6 +366,7 @@ def train(cfg: dict, smoke_test: bool = False):
             B, _, _ = preprocess_lbf(
                 obs, n_agents, n_food,
                 hidden_dim=hidden_dim, device=device,
+                observe_agent_levels=observe_agent_levels,
             )
             B_np = B.cpu().numpy()
 

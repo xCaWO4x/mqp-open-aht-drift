@@ -1,0 +1,132 @@
+# GPL training configuration for Level-Based Foraging — HARDENED variant
+#
+# "Nerfs" applied to the standard LBF setup to expose drift-induced failures:
+#
+#   1. Reduced sight (3 → partial observability, was 8 = full grid)
+#      Forces GPL to rely on type inference rather than direct level readoff.
+#
+#   2. Teammate levels masked in observation (observe_agent_levels: false)
+#      Agent level features are zeroed out for non-self agents, making
+#      teammate type genuinely latent. GPL must infer types from behavior.
+#
+#   3. Increased agent count (4, was 3)
+#      More composition complexity: C(4+2, 2) = 15 compositions vs 10.
+#      Coordination graph has 6 pairwise terms vs 3.
+#
+#   4. force_coop: true
+#      No agent can solo-load any food — always requires cooperation.
+#      Eliminates the "strong agent ignores teammates" heuristic.
+#
+# The stationary baseline should still be learnable (GPL was designed for
+# partial observability), but drift will now break coordination because
+# the agent can't directly read teammate capabilities.
+#
+# Artifacts: results/training_lbf_gpl_hardened/ — see docs/experiment_artifacts.md
+
+# --- Environment ---
+env:
+  id: "Foraging-8x8-4p-3f-v3"
+  backend: "gymnasium"
+  grid_size: 8
+  n_agents: 4
+  n_food: 3
+  max_steps: 50
+  force_coop: true
+  sight: 3                            # NERF: partial observability (was 8)
+  observe_agent_levels: false          # NERF: teammate levels are latent (was true/default)
+
+# --- Agent types (= LBF levels) ---
+types:
+  K: 3
+  levels: [1, 2, 3]
+  level_offset: 1
+
+# --- OU drift process ---
+ou:
+  K: 3
+  dt: 0.01
+  mu: null                            # uniform [1/3, 1/3, 1/3]
+
+# --- Food configuration ---
+food:
+  mode: "fixed"
+  n_food: 3
+  fixed_level_probs:
+    2: 0.6
+    3: 0.4
+  coupled_concentration: 0.7
+
+# --- PREPROCESS dimensions ---
+# With observe_agent_levels: false, LBF drops agent level from obs entirely.
+# Per-agent obs: 3*n_food (food: y,x,level) + 2*n_agents (agents: y,x only).
+# For PREPROCESS:
+#   x_j = (y, x) = 2 features per agent (no level)
+#   u   = (y, x, level) * n_food = 9 features
+#   B_j = [x_j ; u] -> obs_dim = 2 + 9 = 11
+preprocess:
+  agent_feat_dim: 2                   # CHANGED: no level (was 3)
+  food_feat_dim: 3
+  obs_dim: 11                         # CHANGED: 2 + 3*3 = 11 (was 12)
+
+# --- GPL architecture ---
+# Same architecture as baseline — we want to test the SAME model under
+# harder conditions, not change the model.
+model:
+  action_dim: 6
+  hidden_dim: 100
+  type_dim: 100
+  n_gnn_layers: 2
+  pairwise_rank: 5
+
+# --- Training ---
+training:
+  mode: "online"
+  n_episodes: 128000                  # same budget as baseline
+  n_envs: 16
+  lr: 2.5e-4
+  gamma: 0.99
+  t_update: 4
+  t_targ_update: 1
+  polyak_tau: 1.0e-3
+  grad_clip: 10.0
+
+# --- Epsilon schedule ---
+epsilon:
+  init: 1.0
+  final: 0.05
+  decay_steps: 4800000
+  decay_episodes: 1500
+
+# --- GPL variant ---
+variant: "GPL-Q"
+tau: null
+
+spi:
+  init_temp: 1.0
+  final_temp: 0.01
+  anneal_method: "linear"
+  anneal_episodes: 1500
+
+# --- Evaluation ---
+eval:
+  eval_every: 50
+  eval_episodes: 5
+  save_every: 50
+
+# --- Drift evaluation ---
+drift_eval:
+  n_episodes: 50
+  n_seeds: 5
+  stability_threshold: 0.10
+  primary_metric: "iqm_return"
+
+# --- Logging ---
+logging:
+  wandb_project: "open-aht-drift"
+  wandb_group: "gpl-lbf-hardened"
+  tensorboard: true
+  log_dir: "runs/training_lbf_gpl_hardened"
+  results_dir: "results/training_lbf_gpl_hardened"
+
+# --- Reproducibility ---
+seed: 42

@@ -168,23 +168,63 @@ When you inject specific levels per player via `min_player_level = max_player_le
 
 ---
 
+## Current status
+
+### Baseline drift eval: DONE — too robust
+
+The original LBF setup (full observability, 3 agents, no forced coop) is structurally too forgiving to expose drift-induced failures. Key findings:
+
+- **47/50** grid cells under 10% degradation (fixed food, extended σ up to 3.0)
+- **50/50** stable under coupled food — removing the capability confound eliminates all sharp drops
+- Only **dt scaling** (effective simplex mobility) breaks the policy; σ alone is insufficient
+- Capability confound analysis (`experiments/analyze_capability_confound.py`) confirms that most variance in returns is explained by team composition strength, not drift parameters
+
+**Root cause:** teammate capability (levels) is directly observable, agent count is small, heterogeneity is low-dimensional, and OU drift is smooth. The policy doesn't need to infer latent types or adapt under uncertainty — it directly conditions on visible information and relies on generic coordination.
+
+### Hardened variant: IN PROGRESS
+
+To expose genuine drift vulnerability, the LBF setup has been "nerfed" to make teammate modeling necessary and fragile:
+
+| Nerf | Baseline | Hardened | Effect |
+|------|----------|----------|--------|
+| **Sight** | 8 (full grid) | 3 (partial) | Forces type inference from local observations |
+| **Agent levels** | Observable | Masked (`observe_agent_levels: false`) | Teammate type is genuinely latent |
+| **Agent count** | 3 | 4 | 15 compositions (was 10), 6 pairwise CG terms (was 3) |
+| **Cooperation** | Optional | Forced (`force_coop: true`) | No solo-loading — must coordinate |
+
+**Result layout:**
+
+| Variant | Config | Training results | Eval results |
+|---------|--------|-----------------|--------------|
+| Baseline (before nerf) | `configs/gpl_lbf.yaml` | `results/training_lbf_gpl_paper_128k/` | `results/eval_drift_sweep_main*/` |
+| Hardened (after nerf) | `configs/gpl_lbf_hardened.yaml` | `results/training_lbf_gpl_hardened/` | `results/eval_drift_sweep_hardened/` |
+
+**Submit (training → eval):**
+```bash
+bash scripts/slurm/submit_hardened.sh all
+```
+
 ## What to do next
 
-### Immediate: Submit drift eval sweep (Step 15)
+### Immediate: Train and eval hardened variant
 ```bash
-bash scripts/slurm/submit_drift_eval.sh
+bash scripts/slurm/submit_hardened.sh all   # training + eval (chained)
 ```
-Wait for results. Look for:
-- Does degradation increase monotonically with sigma?
-- Does higher theta (faster mean-reversion) protect against high sigma?
-- Where is the stability boundary (10% degradation contour)?
+After results, compare baseline vs hardened:
+- Does degradation now increase meaningfully with sigma?
+- Does the capability confound diminish (since levels are no longer observable)?
+- Is the stationary hardened baseline still learnable (non-zero IQM)?
 
-### After sweep results: Analysis (Step 16)
+### After hardened results: Analysis (Step 16)
+- Run `experiments/analyze_capability_confound.py` on hardened results
 - Fill in `eval/metrics.py`: IQM with bootstrap CIs, degradation AUC, recovery speed
 - Fill in `eval/stability_region.py`: interpolated boundary curves, region area computation
-- Write formal analysis of the heatmap results
+- Side-by-side comparison of baseline vs hardened heatmaps
 
-### Later steps
+### Future extensions (if hardened still too robust)
+- **Abrupt composition switches** (step drift instead of smooth OU)
+- **Rare type injection** (novel agent types not seen in training)
+- **Observation noise / delay** (corrupt or lag state information)
 - **Step 17**: `drift/drift_schedule.py` — continuous, step, and sudden drift modes
 - **Step 18**: Drift-aware adapter — Bayesian belief tracker or D.3 autoencoder
 - **Step 19**: Wolfpack experiments

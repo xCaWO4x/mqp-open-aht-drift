@@ -177,6 +177,67 @@ To **fine-tune** or **continual-train** under drift (separate experiment), start
 
 ---
 
+## Hardened LBF variant (partial obs, latent types, 4 agents, force coop)
+
+Designed to expose drift vulnerability by making teammate modeling necessary and fragile. The baseline was too forgiving: full observability + small team + optional cooperation meant the policy never needed to infer latent types.
+
+### Training (hardened)
+
+| Item | Location |
+|------|-----------|
+| **Config** | `configs/gpl_lbf_hardened.yaml` |
+| **Checkpoints & logs** | `results/training_lbf_gpl_hardened/` |
+| **Final policy file** | `results/training_lbf_gpl_hardened/checkpoints/gpl_final.pt` |
+| **Slurm** | `scripts/slurm/training_lbf_gpl_hardened.slurm` |
+| **Submit helper** | `scripts/slurm/submit_hardened.sh` |
+
+**Job name (Slurm):** `train-lbf-gpl-hardened`
+
+**Nerfs applied (vs baseline `gpl_lbf.yaml`):**
+
+| Setting | Baseline | Hardened | Rationale |
+|---------|----------|----------|-----------|
+| `sight` | 8 (full) | 3 | Strict partial observability |
+| `observe_agent_levels` | true | false | Teammate levels latent (obs drops from 3→2 features per agent) |
+| `n_agents` | 3 | 4 | 15 compositions, 6 CG pairwise terms |
+| `force_coop` | false | true | Must coordinate, no solo-loading |
+| `obs_dim` | 12 | 11 | 2 (agent: y,x) + 9 (food: 3×3) |
+
+**Code changes for hardened support:**
+- `envs/env_utils.py`: `preprocess_lbf()` accepts `observe_agent_levels` kwarg (adjusts agent feature dim 3→2)
+- `experiments/train_gpl.py`: `make_lbf_env()` passes `observe_agent_levels` to `ForagingEnv`
+- `experiments/eval_drift.py`: same `make_lbf_env()` + `preprocess_lbf()` changes
+
+### Eval drift (hardened)
+
+| Item | Location |
+|------|-----------|
+| **Results directory** | `results/eval_drift_sweep_hardened/` |
+| **Slurm** | `scripts/slurm/drift_eval_sweep_hardened.slurm` |
+| **Sweep config** | `configs/drift_sweep.yaml` (same grid as baseline) |
+
+**Job name (Slurm):** `drift-eval-hardened`
+
+Uses the hardened checkpoint with the canonical σ×θ grid. Compare directly against `results/eval_drift_sweep_main/` to isolate the effect of the nerfs.
+
+### Comparison workflow
+
+```bash
+# 1. Train hardened (or chain both)
+bash scripts/slurm/submit_hardened.sh all
+
+# 2. After training + eval complete, run confound analysis on both
+python experiments/analyze_capability_confound.py \
+  --episodes-csv results/eval_drift_sweep_main/drift_eval_episodes.csv \
+  --out-dir results/capability_confound_baseline
+
+python experiments/analyze_capability_confound.py \
+  --episodes-csv results/eval_drift_sweep_hardened/drift_eval_episodes.csv \
+  --out-dir results/capability_confound_hardened
+```
+
+---
+
 ## Archive
 
 | Path | Note |
