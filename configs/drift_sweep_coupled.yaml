@@ -5,9 +5,11 @@
 # the pure effect of compositional non-stationarity from changes in effective
 # task difficulty.
 #
-# Designed for checkpoint: results/gpl_lbf_train_01_paper_full/checkpoints/gpl_final.pt
+# Extended σ grid (same as drift_sweep_extended.yaml): drift_sweep_coupled_extended.yaml
+# → results/eval_drift_sweep_coupled_extended/
+#
 # Compare results against drift_sweep.yaml (fixed food) to quantify the
-# capability confound.
+# capability confound. Checkpoint: results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt
 
 sweep:
   sigmas: [0.0, 0.01, 0.05, 0.1, 0.2, 0.5]

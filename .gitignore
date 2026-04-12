@@ -11,7 +11,8 @@ __pycache__/
 dist/
 build/
 
-# Results / artifacts
+# Large artifacts (never commit — keep on cluster/disk for training & sweeps)
+# Layout: docs/experiment_artifacts.md | copy elsewhere: rsync -a results/ logs/ <dest>/
 results/
 runs/
 wandb/

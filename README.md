@@ -267,7 +267,14 @@ python experiments/eval_drift.py --checkpoint path.pt --sweep
 
 # Smoke test (3 episodes, reduced grid)
 python experiments/eval_drift.py --checkpoint path.pt --smoke-test
+
+# Extended σ grid (separate results dir; keeps canonical eval_drift_sweep_main intact)
+python experiments/eval_drift.py --checkpoint path.pt --sweep \
+  --sweep-config configs/drift_sweep_extended.yaml \
+  --results-dir results/eval_drift_sweep_main_extended
 ```
+
+Cluster: `bash scripts/slurm/submit_drift_eval_extended.sh` submits fixed extended, coupled extended, and fixed extended with `ou.dt=0.1`. See **`docs/experiment_artifacts.md`** for the full map and OU scaling notes.
 
 ### `configs/drift_sweep.yaml`
 

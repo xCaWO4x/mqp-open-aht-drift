@@ -1,0 +1,24 @@
+# Extended σ grid with larger OU timestep (eval-only mobility ablation).
+#
+# Same sigmas as drift_sweep_extended.yaml but dt=0.1 → σ·√dt ≈ 0.316·σ per episode
+# (vs ~0.1·σ with default dt=0.01). Isolates "stronger simplex motion per reset" from
+# raw σ scaling.
+#
+# Results: results/eval_drift_sweep_main_extended_dt/
+# Slurm: scripts/slurm/drift_eval_sweep_extended_dt.slurm
+#
+# Compare to: eval_drift_sweep_main_extended/ (same σ, default dt).
+
+ou:
+  dt: 0.1
+
+sweep:
+  sigmas: [0.0, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 1.5, 2.0, 3.0]
+  thetas: [0.05, 0.15, 0.3, 0.5, 1.0]
+
+eval:
+  n_episodes: 100
+  n_seeds: 5
+  stability_threshold: 0.10
+  primary_metric: "iqm_return"
+  seed: 42
