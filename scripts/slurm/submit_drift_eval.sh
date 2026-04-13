@@ -10,5 +10,5 @@ cd "$ROOT"
 mkdir -p logs/slurm
 
 echo "Submitting drift eval sweep..."
-sbatch scripts/slurm/drift_eval_sweep.slurm
+sbatch --export=ALL scripts/slurm/drift_eval_sweep.slurm
 echo "Done. squeue -u \$USER"

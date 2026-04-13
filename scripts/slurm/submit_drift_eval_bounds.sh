@@ -10,5 +10,5 @@ cd "$ROOT"
 mkdir -p logs/slurm
 
 echo "Submitting eval drift sweep array (tasks 0–3)..."
-command sbatch scripts/slurm/eval_drift_sweep_bounds_array.slurm
+command sbatch --export=ALL scripts/slurm/eval_drift_sweep_bounds_array.slurm
 echo "Done. squeue -u \$USER"

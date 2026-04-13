@@ -8,5 +8,5 @@ cd "$ROOT"
 mkdir -p logs/slurm
 
 echo "Submitting training (paper 128k)..."
-command sbatch scripts/slurm/training_lbf_gpl_paper_128k.slurm
+command sbatch --export=ALL scripts/slurm/training_lbf_gpl_paper_128k.slurm
 echo "Done. squeue -u \$USER"

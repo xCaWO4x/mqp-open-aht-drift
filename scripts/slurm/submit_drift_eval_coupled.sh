@@ -9,5 +9,5 @@ cd "$ROOT"
 mkdir -p logs/slurm
 
 echo "Submitting drift eval sweep (coupled food — capability-confound ablation)..."
-sbatch scripts/slurm/drift_eval_sweep_coupled.slurm
+sbatch --export=ALL scripts/slurm/drift_eval_sweep_coupled.slurm
 echo "Done. squeue -u \$USER"
