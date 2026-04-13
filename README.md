@@ -187,8 +187,8 @@ from envs.drift_wrapper import DriftWrapper
 
 inner = ForagingEnv(players=3, min_player_level=[1,1,1], max_player_level=[3,3,3],
                     field_size=(8,8), max_num_food=3, min_food_level=[1,1,1],
-                    max_food_level=[3,3,3], sight=8, max_episode_steps=200,
-                    force_coop=True)
+                    max_food_level=[3,3,3], sight=8, max_episode_steps=50,
+                    force_coop=False)
 ou = OUProcess(K=3, theta=0.15, sigma=0.2, seed=42)
 env = DriftWrapper(inner, ou, n_agents=3, n_food=3, food_mode="fixed", seed=42)
 
@@ -282,14 +282,14 @@ Default sweep configuration:
 
 | Parameter | Value |
 |-----------|-------|
-| Environment | LBF 8x8, 3 agents, 3 food, force_coop=True |
+| Environment | LBF 8x8, 3 agents, 3 food, `force_coop=false`, `max_steps=50` (paper; from `gpl_lbf.yaml`) |
 | Agent types (K) | 3 (levels 1, 2, 3) |
 | Food mode | "fixed" — levels from {2: 0.6, 3: 0.4} |
 | Sigmas | 0, 0.01, 0.05, 0.1, 0.2, 0.5 (σ=0 baseline) |
 | Thetas | 0.05, 0.15, 0.3, 0.5, 1.0 |
 | Episodes per grid point | 100 |
 | Seeds | 5 (bootstrap CIs) |
-| Max steps per episode | 200 |
+| Max steps per episode | 50 (inherited from training config for eval) |
 | Stability threshold | 10% degradation |
 | Primary metric | IQM return |
 
