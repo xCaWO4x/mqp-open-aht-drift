@@ -1,14 +1,16 @@
 #!/bin/bash
-# Submit drift evaluation sweep.
-# Usage (from repo root):
-#   bash scripts/slurm/submit_drift_eval.sh
-#   DRIFT_CHECKPOINT=path/to/other.pt bash scripts/slurm/submit_drift_eval.sh
+# Submit Q2 and Q4 drift eval jobs (requires Q1/Q3 checkpoints).
+# Usage: bash scripts/slurm/submit_drift_eval.sh
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 mkdir -p logs/slurm
 
-echo "Submitting drift eval sweep..."
-sbatch scripts/slurm/drift_eval_sweep.slurm
+echo "Submitting Q2 (baseline drift eval)..."
+sbatch scripts/slurm/q2_drift_eval.slurm
+
+echo "Submitting Q4 (hardened drift eval)..."
+sbatch scripts/slurm/q4_drift_eval.slurm
+
 echo "Done. squeue -u \$USER"

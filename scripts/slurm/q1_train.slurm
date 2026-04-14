@@ -1,16 +1,17 @@
 #!/bin/bash
-# Stationary LBF — GPL paper-length training (128k episodes, 16 envs).
-# Outputs: results/training_lbf_gpl_paper_128k/ (see docs/experiment_artifacts.md)
-#SBATCH --job-name=train-lbf-gpl-128k
+# Q1 — Baseline GPL training (stationary LBF, 128k episodes)
+# Config: configs/gpl_lbf.yaml
+# Results: results/q1_baseline_stationary/
+#SBATCH --job-name=q1-train
 #SBATCH --account=xliu14
-#SBATCH --partition=long
+#SBATCH --partition=short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:1
-#SBATCH --constraint=RTX6000B
-#SBATCH --time=7-00:00:00
+#SBATCH --constraint=rtx6000b
+#SBATCH --time=1-00:00:00
 #SBATCH --output=logs/slurm/%x-%j.out
 #SBATCH --error=logs/slurm/%x-%j.err
 
@@ -19,14 +20,14 @@ cd "${SLURM_SUBMIT_DIR}" || exit 1
 mkdir -p logs/slurm
 
 if [ -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]; then
-  # shellcheck source=/dev/null
   source "${HOME}/miniconda3/etc/profile.d/conda.sh"
 elif [ -f "${HOME}/anaconda3/etc/profile.d/conda.sh" ]; then
-  # shellcheck source=/dev/null
   source "${HOME}/anaconda3/etc/profile.d/conda.sh"
 fi
 conda activate "${MQP_CONDA_ENV:-drift-aht}"
 
 export PYTHONUNBUFFERED=1
+echo "Q1: Baseline training (full obs, 3 agents, no force coop)"
 nvidia-smi
-python -u experiments/train_gpl.py --config configs/gpl_lbf.yaml --device cuda
+
+python -u experiments/train_gpl.py --config configs/gpl_lbf.yaml
