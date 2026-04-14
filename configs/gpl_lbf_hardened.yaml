@@ -1,13 +1,13 @@
-# GPL training configuration for Level-Based Foraging — HARDENED variant
+# Q3 — Hardened GPL training for Level-Based Foraging
 #
-# "Nerfs" applied to the standard LBF setup to expose drift-induced failures:
+# "Nerfs" applied to the baseline (Q1) to expose drift-induced failures:
 #
 #   1. Reduced sight (3 → partial observability, was 8 = full grid)
 #      Forces GPL to rely on type inference rather than direct level readoff.
 #
 #   2. Teammate levels masked in observation (observe_agent_levels: false)
-#      Agent level features are zeroed out for non-self agents, making
-#      teammate type genuinely latent. GPL must infer types from behavior.
+#      Agent level features dropped from obs, making teammate type
+#      genuinely latent. GPL must infer types from behavior.
 #
 #   3. Increased agent count (4, was 3)
 #      More composition complexity: C(4+2, 2) = 15 compositions vs 10.
@@ -17,11 +17,11 @@
 #      No agent can solo-load any food — always requires cooperation.
 #      Eliminates the "strong agent ignores teammates" heuristic.
 #
-# The stationary baseline should still be learnable (GPL was designed for
-# partial observability), but drift will now break coordination because
-# the agent can't directly read teammate capabilities.
-#
-# Artifacts: results/training_lbf_gpl_hardened/ — see docs/experiment_artifacts.md
+# Quadrant layout:
+#   Q1: baseline stationary  → results/q1_baseline_stationary/  (gpl_lbf.yaml)
+#   Q2: baseline + drift     → results/q2_baseline_drift/       (gpl_lbf.yaml)
+#   Q3: hardened stationary   → results/q3_hardened_stationary/
+#   Q4: hardened + drift      → results/q4_hardened_drift/
 
 # --- Environment ---
 env:
@@ -123,10 +123,10 @@ drift_eval:
 # --- Logging ---
 logging:
   wandb_project: "open-aht-drift"
-  wandb_group: "gpl-lbf-hardened"
+  wandb_group: "q3-hardened"
   tensorboard: true
-  log_dir: "runs/training_lbf_gpl_hardened"
-  results_dir: "results/training_lbf_gpl_hardened"
+  log_dir: "runs/q3_hardened_stationary"
+  results_dir: "results/q3_hardened_stationary"
 
 # --- Reproducibility ---
 seed: 42

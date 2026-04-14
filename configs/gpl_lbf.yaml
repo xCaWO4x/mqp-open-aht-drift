@@ -1,9 +1,15 @@
-# GPL training configuration for Level-Based Foraging
+# Q1 — Baseline GPL training for Level-Based Foraging
 # Hyperparameters aligned with Rahman et al. 2023 GPL source code
 # (Open_Experiments/LBF/GPL-Q/)
 #
 # Paper-length GPL training on LBF (128k ep, 16 envs, paper ε decay).
-# Artifacts: results/training_lbf_gpl_paper_128k/ — see docs/experiment_artifacts.md
+# Full observability, 3 agents, no forced coop.
+#
+# Quadrant layout:
+#   Q1: baseline stationary  → results/q1_baseline_stationary/
+#   Q2: baseline + drift     → results/q2_baseline_drift/
+#   Q3: hardened stationary   → results/q3_hardened_stationary/  (gpl_lbf_hardened.yaml)
+#   Q4: hardened + drift      → results/q4_hardened_drift/       (gpl_lbf_hardened.yaml)
 
 # --- Environment ---
 env:
@@ -107,10 +113,10 @@ drift_eval:
 # --- Logging ---
 logging:
   wandb_project: "open-aht-drift"
-  wandb_group: "gpl-lbf-training-paper-128k"
+  wandb_group: "q1-baseline"
   tensorboard: true
-  log_dir: "runs/training_lbf_gpl_paper_128k"
-  results_dir: "results/training_lbf_gpl_paper_128k"
+  log_dir: "runs/q1_baseline_stationary"
+  results_dir: "results/q1_baseline_stationary"
   # Per-episode: target_distribution, realized_composition, agent_levels,
   # food_levels, mean_agent_level, total_team_capability, mean_food_level
 

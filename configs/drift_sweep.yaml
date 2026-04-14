@@ -1,28 +1,16 @@
-# Drift degradation sweep configuration
-# Grid of (sigma, theta) OU parameters to evaluate GPL robustness.
-# Canonical grid for eval_drift.py with --sweep-config configs/drift_sweep.yaml.
+# Drift evaluation sweep grid
+# Used by Q2 (baseline + drift) and Q4 (hardened + drift).
+# The training config (--config) determines env/model; this file only sets the grid.
 #
-# Higher-diffusion extension (keeps these σ values plus σ ∈ {1.0,1.5,2.0,3.0}):
-#   configs/drift_sweep_extended.yaml → results/eval_drift_sweep_main_extended/
-# Optional larger OU dt (fixed food only): configs/drift_sweep_extended_dt.yaml
-#
-# Boundary sweeps: configs/drift_sweep_bounds_*.yaml + eval_drift_sweep_bounds_array.slurm
-#
-# Default checkpoint: results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt
-# Baseline reference: sigma=0 row (stationary uniform composition, no drift).
-#
-# Note: env/model/food settings come from the TRAINING config (--config flag
-# in eval_drift.py). This file only specifies the sweep grid and eval settings.
+# sigma=0 row is the stationary baseline (no noise → composition stays uniform).
 
 sweep:
-  # sigma=0 row is the stationary baseline (no noise → composition stays uniform).
-  # Remaining rows probe increasing volatility at each mean-reversion speed.
-  sigmas: [0.0, 0.01, 0.05, 0.1, 0.2, 0.5]
+  sigmas: [0.0, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 1.5, 2.0, 3.0]
   thetas: [0.05, 0.15, 0.3, 0.5, 1.0]
 
 eval:
-  n_episodes: 100     # episodes per (sigma, theta) grid point
-  n_seeds: 5          # seeds for bootstrap CIs
-  stability_threshold: 0.10   # 10% IQM drop = "degraded"
+  n_episodes: 100
+  n_seeds: 5
+  stability_threshold: 0.10
   primary_metric: "iqm_return"
   seed: 42

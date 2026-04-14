@@ -1,8 +1,9 @@
 #!/bin/bash
-# Drift evaluation sweep: evaluate 128k GPL checkpoint across (sigma, theta) grid
-# Uses configs/drift_sweep.yaml (6 sigmas x 5 thetas x 100 eps x 5 seeds = 15,000 eps)
-# Inference only — much lighter than training: ~1-2h on GPU, ~3-4h on CPU.
-#SBATCH --job-name=drift-eval-sweep
+# Q4 — Hardened GPL + drift evaluation sweep
+# Uses Q3 checkpoint with extended (sigma, theta) grid
+# Config: configs/gpl_lbf_hardened.yaml + configs/drift_sweep.yaml
+# Results: results/q4_hardened_drift/
+#SBATCH --job-name=q4-drift
 #SBATCH --account=xliu14
 #SBATCH --partition=short
 #SBATCH --nodes=1
@@ -19,27 +20,25 @@ cd "${SLURM_SUBMIT_DIR}" || exit 1
 mkdir -p logs/slurm
 
 if [ -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]; then
-  # shellcheck source=/dev/null
   source "${HOME}/miniconda3/etc/profile.d/conda.sh"
 elif [ -f "${HOME}/anaconda3/etc/profile.d/conda.sh" ]; then
-  # shellcheck source=/dev/null
   source "${HOME}/anaconda3/etc/profile.d/conda.sh"
 fi
 conda activate "${MQP_CONDA_ENV:-drift-aht}"
 
 export PYTHONUNBUFFERED=1
 
-# Use the 128k (paper-full) checkpoint by default; override with DRIFT_CHECKPOINT env var
-CHECKPOINT="${DRIFT_CHECKPOINT:-results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt}"
-RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/eval_drift_sweep_main}"
+CHECKPOINT="results/q3_hardened_stationary/checkpoints/gpl_final.pt"
+RESULTS_DIR="results/q4_hardened_drift"
 
+echo "Q4: Hardened drift eval"
 echo "Checkpoint: ${CHECKPOINT}"
-echo "Results dir: ${RESULTS_DIR}"
+echo "Results: ${RESULTS_DIR}"
 nvidia-smi
 
 python -u experiments/eval_drift.py \
     --checkpoint "${CHECKPOINT}" \
-    --config configs/gpl_lbf.yaml \
+    --config configs/gpl_lbf_hardened.yaml \
     --sweep-config configs/drift_sweep.yaml \
     --sweep \
     --results-dir "${RESULTS_DIR}"

@@ -17,59 +17,32 @@ The learner (agent 0) uses GPL; all teammates act randomly (standard open AHT pr
 
 ---
 
-## Current state
+## Experiment layout: 4 quadrants
 
-### Training: DONE (paper 128k only)
+|  | Stationary (no drift) | Drift |
+|---|---|---|
+| **Baseline** (Rahman paper config) | **Q1** — `results/q1_baseline_stationary/` | **Q2** — `results/q2_baseline_drift/` |
+| **Hardened** (partial obs, latent types, 4p, force coop) | **Q3** — `results/q3_hardened_stationary/` | **Q4** — `results/q4_hardened_drift/` |
 
-One retained training run on HPC (SLURM); shorter-budget presets were removed from the repo layout.
+- **Q1/Q2** use `configs/gpl_lbf.yaml` (full obs, 3 agents, no force coop)
+- **Q3/Q4** use `configs/gpl_lbf_hardened.yaml` (sight=3, no agent levels, 4 agents, force coop)
+- **Q2/Q4** use `configs/drift_sweep.yaml` (10σ × 5θ extended grid)
 
-| Run | Episodes | Env steps | Train avg | Eval IQM | Checkpoint |
-|-----|----------|-----------|-----------|----------|------------|
-| Paper | 128,000 | 5,590,401 | 0.390 | 0.417 | `results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt` |
-
-The 128k result (0.390 avg, 0.417 IQM) is **in the paper's reported range** (~0.35-0.45 for GPL-Q with random teammates in 8x8-3p-3f no-force-coop).
-
-**Artifact map:** see `docs/experiment_artifacts.md`.
-
-**Reward scale context:** In LBF, collecting a food item yields `food.level / max_food_level`. With food levels {2, 3} and max=3, expected reward per food = 0.8. Theoretical max (solo-load all 3 food) = 2.4. Practical ceiling with random teammates and varying agent levels is ~0.5-0.7. The 0.39-0.42 range means GPL collects ~55% of its fair share.
-
-### Drift eval sweep: READY TO RUN
-
-Everything is implemented and waiting to be submitted:
+### What to do now
 
 ```bash
-cd open-aht-drift-clean
+# Step 1: submit Q1 + Q3 training (parallel)
+bash scripts/slurm/submit_training.sh
+
+# Step 2: after both finish, submit Q2 + Q4 drift eval
 bash scripts/slurm/submit_drift_eval.sh
 ```
 
-This runs `experiments/eval_drift.py --sweep` with the 128k checkpoint across a 6x5 (sigma, theta) grid:
-- **sigmas**: [0.0, 0.01, 0.05, 0.1, 0.2, 0.5]  (sigma=0 is stationary baseline)
-- **thetas**: [0.05, 0.15, 0.3, 0.5, 1.0]
-- **100 episodes x 5 seeds** per grid point = 15,000 total episodes
-- Estimated runtime: ~1h on GPU, ~3-4h on CPU
-
-**Outputs** (in `results/eval_drift_sweep_main/` by default):
-- `drift_eval_grid.csv` — sigma, theta, mean_return, iqm_return, degradation
-- `drift_eval_episodes.csv` — per-episode details (returns, agent/food levels, OU state)
-- `baseline_summary.txt` — baseline IQM and stability region count
-- `drift_eval_heatmap.png` — side-by-side mean and IQM return heatmaps
-- `drift_degradation_heatmap.png` — degradation heatmap with stability boundary contour
-
-**Degradation is computed as** `1 - IQM / baseline_IQM` where baseline is the sigma=0 row (stationary uniform composition). A grid point is "stable" if degradation < 10%.
-
-**Extended diffusion sweeps** (higher σ, **new** result directories — canonical `eval_drift_sweep_main/` unchanged):
-
-```bash
-bash scripts/slurm/submit_drift_eval_extended.sh
-```
-
-Submits three jobs: `drift_sweep_extended.yaml` → `results/eval_drift_sweep_main_extended/`, coupled extended → `results/eval_drift_sweep_coupled_extended/`, and `drift_sweep_extended_dt.yaml` (`ou.dt=0.1`) → `results/eval_drift_sweep_main_extended_dt/`. Grid is **10×5** σ×θ (adds σ ∈ {1.0, 1.5, 2.0, 3.0}). Details: **`docs/experiment_artifacts.md`**.
+See `docs/experiment_artifacts.md` for full artifact map.
 
 ---
 
 ## Key architecture decisions (locked)
-
-These are documented in `docs/research_proposal.md` and `project_aht_drift_decisions.md`. Do not change without explicit approval:
 
 - **LBF-only phase** (no Wolfpack until Step 19)
 - **K=3** agent types mapping to LBF levels {1, 2, 3}
@@ -83,49 +56,41 @@ These are documented in `docs/research_proposal.md` and `project_aht_drift_decis
 
 ```
 open-aht-drift-clean/
-  agents/
-    gpl/
-      gpl_agent.py          # Top-level GPL agent (Algorithm 5, Polyak soft update, advance_hidden)
-      type_inference.py      # LSTM type inference (FC->ReLU->FC->LSTM->ReLU, paper Fig 7a)
-      agent_model.py         # GNN agent model (RFM + MLP_eta, paper Fig 7d-f, gnn_hidden=70)
-      joint_action_value.py  # CG Q-network (MLP_beta/delta, paper Fig 7b-c, pairwise_rank=5)
-    baselines/
-      random_agent.py
+  agents/gpl/
+    gpl_agent.py          # Top-level GPL agent (Algorithm 5, Polyak soft update, advance_hidden)
+    type_inference.py      # LSTM type inference
+    agent_model.py         # GNN agent model
+    joint_action_value.py  # CG Q-network
+  agents/baselines/
+    random_agent.py
   configs/
-    gpl_lbf.yaml             # Training config (128k ep, 16 envs, paper hyperparams)
-    drift_sweep.yaml          # Canonical eval drift grid
-    drift_sweep_extended.yaml # Extended σ tail (+ coupled / + dt variants)
-    drift_sweep_bounds_*.yaml # Boundary sweeps for eval_drift
-    gpl_wolfpack.yaml         # Future: Wolfpack config
+    gpl_lbf.yaml           # Q1/Q2 baseline config
+    gpl_lbf_hardened.yaml   # Q3/Q4 hardened config
+    drift_sweep.yaml        # Drift eval grid (10σ × 5θ)
+    gpl_wolfpack.yaml       # Future
   drift/
-    ou_process.py             # OU process on K-simplex with Euclidean projection
-    drift_schedule.py         # EMPTY — Step 17
-    belief_tracker.py         # EMPTY — Step 18
+    ou_process.py           # OU process on K-simplex with Euclidean projection
   envs/
-    drift_wrapper.py          # Gym wrapper: advances OU, samples composition, injects levels
-    env_utils.py              # PREPROCESS: LBF obs parsing (FOOD FIRST then agents), Wolfpack
+    drift_wrapper.py        # Gym wrapper: advances OU, samples composition
+    env_utils.py            # PREPROCESS: LBF obs parsing (FOOD FIRST), supports observe_agent_levels
   eval/
-    logger.py                 # TensorBoard + optional wandb logging
-    metrics.py                # EMPTY — Step 16
-    stability_region.py       # EMPTY — Step 16
+    logger.py               # TensorBoard + optional wandb
   experiments/
-    train_gpl.py              # Training loop (16 parallel envs, per-env hidden state mgmt)
-    eval_drift.py             # Drift eval (single point + sweep, degradation, heatmaps)
-    pilot_degradation.py      # Legacy pilot script (still uses RandomAgent)
+    train_gpl.py            # Training loop (16 parallel envs)
+    eval_drift.py           # Drift eval (single point + sweep)
+    analyze_capability_confound.py  # Capability-confound analysis
   scripts/slurm/
-    training_lbf_gpl_paper_128k.slurm   # paper training
-    submit_training_lbf_gpl_paper.sh
-    drift_eval_sweep.slurm              # canonical eval drift sweep
-    drift_eval_sweep_extended*.slurm    # extended σ (+ coupled / dt ablation)
-    submit_drift_eval_extended.sh
-    eval_drift_sweep_bounds_array.slurm # boundary sweeps (array 0–3)
-    submit_drift_eval.sh
-    submit_drift_eval_bounds.sh
+    q1_train.slurm          # Q1 baseline training
+    q2_drift_eval.slurm     # Q2 baseline drift eval
+    q3_train.slurm          # Q3 hardened training
+    q4_drift_eval.slurm     # Q4 hardened drift eval
+    submit_training.sh      # Submit Q1 + Q3
+    submit_drift_eval.sh    # Submit Q2 + Q4
   tests/
-    test_gpl_forward.py       # 37 tests for GPL modules
-    test_preprocess.py        # 13 tests for PREPROCESS (LBF + Wolfpack)
-    test_drift_wrapper.py     # 23 tests for DriftWrapper
-    test_ou_process.py        # 10 tests for OU process
+    test_gpl_forward.py     # 37 tests
+    test_preprocess.py      # 13 tests (19 with hardened)
+    test_drift_wrapper.py   # 23 tests
+    test_ou_process.py      # 10 tests
 ```
 
 ---
@@ -139,96 +104,24 @@ open-aht-drift-clean/
 [food_0(y,x,level), food_1(y,x,level), ..., self(y,x,level), other_0(y,x,level), ...]
 ```
 - Food features: `obs[0 : n_food*3]`
-- Agent features: `obs[n_food*3 : n_food*3 + n_agents*3]`  (self first)
-
-This was a critical bug that took multiple sessions to find. The old code had it backwards (agents first). The fix is in `preprocess_lbf()` in `envs/env_utils.py`.
+- Agent features: `obs[n_food*3 :]` — self first, then others
+- With `observe_agent_levels=false`: agent features are (y,x) only, 2 per agent instead of 3
 
 ### act() does NOT update hidden states
 
-`GPLAgent.act()` selects an action but discards LSTM hidden state outputs. This is intentional: it ensures `train_step_online()` sees the same pre-step hidden state for both QJOINT (line 14) and QV (line 15) of Algorithm 5.
-
-During **training**, `train_step_online()` is the sole hidden state updater.
-
-During **evaluation**, call `agent.advance_hidden(B_np)` after `agent.act()` to advance all three hidden state paths (q, agent, q_target).
+`GPLAgent.act()` selects an action but discards LSTM hidden state outputs. During **evaluation**, call `agent.advance_hidden(B_np)` after `agent.act()`.
 
 ### Per-env hidden state management (parallel envs)
 
-Training uses 16 parallel environments. Each env has its own tuple of LSTM hidden states `(hidden_q, hidden_agent, hidden_q_target)`. Before processing each env, the agent's internal hidden states are swapped in from `env_hidden[env_idx]`; after processing, they're swapped back out. Hidden states are zeroed on episode reset.
+Training uses 16 parallel environments. Each env has its own LSTM hidden states swapped in/out before/after processing.
 
 ### Polyak soft update
 
-Target networks use Polyak averaging (`tau=1e-3`) every step, not hard copy every N steps:
-```
-phi_target = (1 - tau) * phi_target + tau * phi
-```
+Target networks: `phi_target = (1 - tau) * phi_target + tau * phi` with tau=1e-3 every step.
 
 ### LBF spawn_players() permutes levels
 
-When you inject specific levels per player via `min_player_level = max_player_level = [L1, L2, L3]`, LBF's `spawn_players()` randomly permutes the level array before assigning. This preserves the overall composition but scrambles which player gets which level. This is fine for our study.
-
----
-
-## Current status
-
-### Baseline drift eval: DONE — too robust
-
-The original LBF setup (full observability, 3 agents, no forced coop) is structurally too forgiving to expose drift-induced failures. Key findings:
-
-- **47/50** grid cells under 10% degradation (fixed food, extended σ up to 3.0)
-- **50/50** stable under coupled food — removing the capability confound eliminates all sharp drops
-- Only **dt scaling** (effective simplex mobility) breaks the policy; σ alone is insufficient
-- Capability confound analysis (`experiments/analyze_capability_confound.py`) confirms that most variance in returns is explained by team composition strength, not drift parameters
-
-**Root cause:** teammate capability (levels) is directly observable, agent count is small, heterogeneity is low-dimensional, and OU drift is smooth. The policy doesn't need to infer latent types or adapt under uncertainty — it directly conditions on visible information and relies on generic coordination.
-
-### Hardened variant: IN PROGRESS
-
-To expose genuine drift vulnerability, the LBF setup has been "nerfed" to make teammate modeling necessary and fragile:
-
-| Nerf | Baseline | Hardened | Effect |
-|------|----------|----------|--------|
-| **Sight** | 8 (full grid) | 3 (partial) | Forces type inference from local observations |
-| **Agent levels** | Observable | Masked (`observe_agent_levels: false`) | Teammate type is genuinely latent |
-| **Agent count** | 3 | 4 | 15 compositions (was 10), 6 pairwise CG terms (was 3) |
-| **Cooperation** | Optional | Forced (`force_coop: true`) | No solo-loading — must coordinate |
-
-**Result layout:**
-
-| Variant | Config | Training results | Eval results |
-|---------|--------|-----------------|--------------|
-| Baseline (before nerf) | `configs/gpl_lbf.yaml` | `results/training_lbf_gpl_paper_128k/` | `results/eval_drift_sweep_main*/` |
-| Hardened (after nerf) | `configs/gpl_lbf_hardened.yaml` | `results/training_lbf_gpl_hardened/` | `results/eval_drift_sweep_hardened/` |
-
-**Submit (training → eval):**
-```bash
-bash scripts/slurm/submit_hardened.sh all
-```
-
-## What to do next
-
-### Immediate: Train and eval hardened variant
-```bash
-bash scripts/slurm/submit_hardened.sh all   # training + eval (chained)
-```
-After results, compare baseline vs hardened:
-- Does degradation now increase meaningfully with sigma?
-- Does the capability confound diminish (since levels are no longer observable)?
-- Is the stationary hardened baseline still learnable (non-zero IQM)?
-
-### After hardened results: Analysis (Step 16)
-- Run `experiments/analyze_capability_confound.py` on hardened results
-- Fill in `eval/metrics.py`: IQM with bootstrap CIs, degradation AUC, recovery speed
-- Fill in `eval/stability_region.py`: interpolated boundary curves, region area computation
-- Side-by-side comparison of baseline vs hardened heatmaps
-
-### Future extensions (if hardened still too robust)
-- **Abrupt composition switches** (step drift instead of smooth OU)
-- **Rare type injection** (novel agent types not seen in training)
-- **Observation noise / delay** (corrupt or lag state information)
-- **Step 17**: `drift/drift_schedule.py` — continuous, step, and sudden drift modes
-- **Step 18**: Drift-aware adapter — Bayesian belief tracker or D.3 autoencoder
-- **Step 19**: Wolfpack experiments
-- **Step 20**: Paper-ready plots and statistical analysis
+When injecting levels via `min_player_level = max_player_level = [L1, L2, ...]`, LBF randomly permutes. This is fine.
 
 ---
 
@@ -238,12 +131,11 @@ After results, compare baseline vs hardened:
 - **Conda env**: drift-aht (override with `MQP_CONDA_ENV`)
 - **GPU constraint**: RTX6000B (training), any GPU fine for eval
 - **Conda paths**: checks both `~/miniconda3` and `~/anaconda3`
-- **Key env vars**: `DRIFT_CHECKPOINT`, `DRIFT_RESULTS_DIR`, `MQP_CONDA_ENV`
 
 ---
 
 ## Files NOT to touch
 
-- Anything in `runs/` or `results/` (active training/eval logs and checkpoints)
-- `logs/slurm/` (SLURM output logs)
+- Anything in `runs/` or `results/`
+- `logs/slurm/`
 - `.claude/` project memory files
