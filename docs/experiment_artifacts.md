@@ -207,3 +207,26 @@ rsync -a --progress logs/slurm/ user@host:path/to/backup/slurm-logs/
 ```
 
 Git branches carry **configs, Slurm, and docs only**; bundle `results/` and `logs/` separately when archiving a paper snapshot.
+
+### Policy trained on paper LBF (“nerfed”) — isolated drift bundle
+
+After **128k training** with current `configs/gpl_lbf.yaml` (50-step LBF, `force_coop=false`), re-run **all** standard sweeps into a **fresh tree** so legacy CSVs under `eval_drift_sweep_main/` etc. stay untouched for comparison:
+
+| Output (under one parent) | Contents |
+|---------------------------|----------|
+| **`results/eval_drift_policy_nerfed128k/sweep_main`** | Canonical fixed-food grid (`drift_sweep.yaml`) |
+| **`.../sweep_coupled`** | Canonical coupled food (`drift_sweep_coupled.yaml`) |
+| **`.../sweep_main_extended`** | Extended σ, fixed food |
+| **`.../sweep_coupled_extended`** | Extended σ, coupled |
+| **`.../sweep_main_extended_dt`** | Extended σ + `ou.dt=0.1` |
+| **`.../bounds_{mild,reference,stress_sigma,stress_theta}`** | Array boundary presets |
+
+Submit:
+
+```bash
+bash scripts/slurm/submit_drift_eval_policy_nerfed128k.sh
+```
+
+Override parent dir: `DRIFT_POLICY_NERFED_ROOT=results/my_run_name bash scripts/slurm/submit_drift_eval_policy_nerfed128k.sh`
+
+Loads **`results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt`** unless `DRIFT_CHECKPOINT` is set. Bounds array uses **`EVAL_DRIFT_POLICY_NERFED_ROOT`** (set by the submit script).

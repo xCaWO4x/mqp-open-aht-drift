@@ -65,6 +65,14 @@ bash scripts/slurm/submit_drift_eval_extended.sh
 
 Submits three jobs: `drift_sweep_extended.yaml` → `results/eval_drift_sweep_main_extended/`, coupled extended → `results/eval_drift_sweep_coupled_extended/`, and `drift_sweep_extended_dt.yaml` (`ou.dt=0.1`) → `results/eval_drift_sweep_main_extended_dt/`. Grid is **10×5** σ×θ (adds σ ∈ {1.0, 1.5, 2.0, 3.0}). Details: **`docs/experiment_artifacts.md`**.
 
+**Paper-LBF policy (post-128k “nerfed” train) — full drift bundle without touching old CSV trees:**
+
+```bash
+bash scripts/slurm/submit_drift_eval_policy_nerfed128k.sh
+```
+
+Writes under **`results/eval_drift_policy_nerfed128k/`** (canonical, extended, coupled, dt, and bounds subdirs). See **`docs/experiment_artifacts.md`**.
+
 ---
 
 ## Key architecture decisions (locked)
@@ -118,6 +126,7 @@ open-aht-drift-clean/
     drift_eval_sweep.slurm              # canonical eval drift sweep
     drift_eval_sweep_extended*.slurm    # extended σ (+ coupled / dt ablation)
     submit_drift_eval_extended.sh
+    submit_drift_eval_policy_nerfed128k.sh  # drift sweeps → eval_drift_policy_nerfed128k/
     eval_drift_sweep_bounds_array.slurm # boundary sweeps (array 0–3)
     submit_drift_eval.sh
     submit_drift_eval_bounds.sh

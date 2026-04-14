@@ -35,25 +35,47 @@ echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
 
 CHECKPOINT="${DRIFT_CHECKPOINT:-results/training_lbf_gpl_paper_128k/checkpoints/gpl_final.pt}"
 
+# Optional: parent dir for a named eval bundle (subdirs per boundary preset).
+# Example: EVAL_DRIFT_POLICY_NERFED_ROOT=results/eval_drift_policy_nerfed128k
+#   → .../bounds_mild, .../bounds_reference, .../bounds_stress_sigma, .../bounds_stress_theta
+# When unset, each task uses legacy default paths (preserves prior behavior).
+NERF_ROOT="${EVAL_DRIFT_POLICY_NERFED_ROOT:-}"
+
 case "${SLURM_ARRAY_TASK_ID}" in
   0)
     SWEEP_YAML="configs/drift_sweep_bounds_mild.yaml"
-    RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/eval_drift_sweep_mild}"
+    if [ -n "${NERF_ROOT}" ]; then
+      RESULTS_DIR="${NERF_ROOT}/bounds_mild"
+    else
+      RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/eval_drift_sweep_mild}"
+    fi
     LABEL="mild"
     ;;
   1)
     SWEEP_YAML="configs/drift_sweep_bounds_reference.yaml"
-    RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/eval_drift_sweep_reference}"
+    if [ -n "${NERF_ROOT}" ]; then
+      RESULTS_DIR="${NERF_ROOT}/bounds_reference"
+    else
+      RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/eval_drift_sweep_reference}"
+    fi
     LABEL="reference"
     ;;
   2)
     SWEEP_YAML="configs/drift_sweep_bounds_stress_sigma.yaml"
-    RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/eval_drift_sweep_stress_sigma}"
+    if [ -n "${NERF_ROOT}" ]; then
+      RESULTS_DIR="${NERF_ROOT}/bounds_stress_sigma"
+    else
+      RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/eval_drift_sweep_stress_sigma}"
+    fi
     LABEL="stress_sigma"
     ;;
   3)
     SWEEP_YAML="configs/drift_sweep_bounds_stress_theta.yaml"
-    RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/eval_drift_sweep_stress_theta}"
+    if [ -n "${NERF_ROOT}" ]; then
+      RESULTS_DIR="${NERF_ROOT}/bounds_stress_theta"
+    else
+      RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/eval_drift_sweep_stress_theta}"
+    fi
     LABEL="stress_theta"
     ;;
   *)
