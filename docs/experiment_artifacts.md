@@ -99,6 +99,25 @@ python experiments/analyze_capability_confound.py \
 
 **Observed outcome (representative run):** fixed-food **extended** (`dt=0.01`) stayed mostly stable vs baseline (**47/50** cells with degradation below 10%); **larger `dt`** produced many unstable cells (**33/50**) especially at σ ∈ {2, 3} and some at σ=0.01. Coupled extended had **50/50** stable on that metric. Interpretation: pushing **effective simplex mobility** (`dt`) hurts more than pushing **σ alone** on this checkpoint; coupled food removes sharp **IQM drops vs baseline** even at high σ.
 
+### Quadrant comparison figures (Q1 vs Q4)
+
+Paper-style **2×2** (legacy pre–paper-LBF policy vs **paper-LBF–trained** policy under the same drift YAMLs):
+
+```bash
+python scripts/plot_quadrant_drift_figures.py --out-dir results/eval_drift_figures_quadrants
+```
+
+Writes under **`results/eval_drift_figures_quadrants/`** (gitignored). Files:
+
+| Quadrant | Meaning (in this repo) | Degradation / stress PNGs | Capability confound (same `analyze_capability_confound.py` as before) |
+|----------|-------------------------|---------------------------|------------------------------------------------------------------------|
+| **Q1** | Legacy policy drift evals (`eval_drift_sweep_*`, checkpoint at eval time) | `q1_main_canonical_degradation.png`, `q1_coupled_canonical_degradation.png`, `q1_main_extended_degradation.png`, `q1_stress_sigma_theta_combined_2x2.png` | `q1_capability_confound/` (`capability_confound_diagnostics.png`, `success_rate_heatmap.png`, `variance_decomposition.png`, `capability_confound_report.txt`) |
+| **Q2** | Train paper-LBF, eval easy-LBF | *Not produced* (no separate result dir; mismatched train/eval not recommended) | — |
+| **Q3** | Train easy-LBF, eval paper-LBF only | *Not produced* | — |
+| **Q4** | Paper-LBF policy + same drift YAMLs (`eval_drift_policy_nerfed128k/`) | `q4_main_canonical_degradation.png`, `q4_coupled_canonical_degradation.png`, `q4_main_extended_degradation.png`, `q4_stress_sigma_theta_combined_2x2.png` | `q4_capability_confound/` (same filenames as Q1 folder) |
+
+**Note:** If `drift_eval_grid.csv` has no `degradation` column (e.g. baseline IQM = 0), `plot_quadrant_drift_figures.py` recomputes degradation from **`mean_return`** at σ=0 for visualization only (Q4 canonical case).
+
 ### Boundary sweeps (array tasks 0–3)
 
 | Task | YAML | Results directory |
