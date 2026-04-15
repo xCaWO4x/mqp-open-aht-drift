@@ -5,8 +5,8 @@ Same as train_gpl.py but uses GPLAgentInf which adds:
   1. Auxiliary level prediction head (cross-entropy on privileged labels)
   2. EMA belief tracker (population context concatenated to obs)
 
-Used for Q3-inf (hardened + inference) experiments. Compare against
-Q3 (plain hardened) to isolate the effect of the auxiliary inference.
+Used for Q3-inf (Q3_rw env + inference) experiments. Compare against
+Q3_rw (no aux/EMA) to isolate the effect of the auxiliary inference.
 
 Usage:
     python experiments/train_gpl_inf.py --config configs/gpl_lbf_q3_inf.yaml
@@ -190,14 +190,13 @@ def train(cfg: dict, smoke_test: bool = False):
     logger = None
     if not smoke_test:
         logger = Logger(
-            log_dir=log_cfg.get("log_dir", "runs/q3_inf"),
-            results_dir=log_cfg.get("results_dir", "results/q3_inf_hardened_stationary"),
-            wandb_project=log_cfg.get("wandb_project", None),
-            wandb_group=log_cfg.get("wandb_group", None),
+            log_dir=log_cfg.get("log_dir", "runs/q3_inf_rw_stationary"),
+            use_wandb=False,
+            use_tensorboard=log_cfg.get("tensorboard", True),
         )
 
     # --- Checkpoint dir ---
-    results_dir = log_cfg.get("results_dir", "results/q3_inf_hardened_stationary")
+    results_dir = log_cfg.get("results_dir", "results/q3_inf_rw_stationary")
     ckpt_dir = os.path.join(results_dir, "checkpoints")
     os.makedirs(ckpt_dir, exist_ok=True)
 
