@@ -1,9 +1,9 @@
 #!/bin/bash
-# Q4 — Hardened GPL + drift evaluation sweep
-# Uses Q3 checkpoint with extended (sigma, theta) grid
-# Config: configs/gpl_lbf_hardened.yaml + configs/drift_sweep.yaml
+# Q4_hardened — Hardened GPL + drift evaluation sweep
+# Uses Q3_hardened checkpoint with extended (sigma, theta) grid
+# Config: configs/gpl_lbf_q3_hardened.yaml + configs/drift_sweep.yaml
 # Results: results/q4_hardened_drift/
-#SBATCH --job-name=q4-drift
+#SBATCH --job-name=q4_hardened_drift
 #SBATCH --account=xliu14
 #SBATCH --partition=short
 #SBATCH --nodes=1
@@ -31,14 +31,14 @@ export PYTHONUNBUFFERED=1
 CHECKPOINT="results/q3_hardened_stationary/checkpoints/gpl_final.pt"
 RESULTS_DIR="results/q4_hardened_drift"
 
-echo "Q4: Hardened drift eval"
+echo "Q4_hardened: drift eval"
 echo "Checkpoint: ${CHECKPOINT}"
 echo "Results: ${RESULTS_DIR}"
 nvidia-smi
 
 python -u experiments/eval_drift.py \
     --checkpoint "${CHECKPOINT}" \
-    --config configs/gpl_lbf_hardened.yaml \
+    --config configs/gpl_lbf_q3_hardened.yaml \
     --sweep-config configs/drift_sweep.yaml \
     --sweep \
     --results-dir "${RESULTS_DIR}"

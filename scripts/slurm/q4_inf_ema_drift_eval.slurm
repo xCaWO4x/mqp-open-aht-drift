@@ -1,7 +1,7 @@
 #!/bin/bash
 # Q4-inf-ema: Drift eval on Q3-inf-ema checkpoint (EMA only, no aux head)
 # Config: configs/gpl_lbf_q3_inf_ema.yaml + configs/drift_sweep.yaml
-# Results: results/q4_inf_ema_hardened_drift/
+# Results: results/q4_inf_ema_rw_drift/
 #SBATCH --job-name=q4-inf-ema
 #SBATCH --account=xliu14
 #SBATCH --partition=short
@@ -27,8 +27,8 @@ conda activate "${MQP_CONDA_ENV:-drift-aht}"
 
 export PYTHONUNBUFFERED=1
 
-CHECKPOINT="results/q3_inf_ema_stationary/checkpoints/gpl_final.pt"
-RESULTS_DIR="results/q4_inf_ema_hardened_drift"
+CHECKPOINT="results/q3_inf_ema_rw_stationary/checkpoints/gpl_final.pt"
+RESULTS_DIR="results/q4_inf_ema_rw_drift"
 
 echo "Q4-inf-ema: Drift eval on EMA-only checkpoint"
 echo "Checkpoint: ${CHECKPOINT}"

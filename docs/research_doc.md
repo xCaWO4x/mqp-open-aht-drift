@@ -110,7 +110,7 @@ Loads Q1's trained checkpoint and evaluates under the full drift sweep grid. No 
 
 The baseline proves too forgiving: GPL with full observability and optional cooperation never needs to infer latent teammate types, so composition drift barely matters. Q3 applies four "nerfs" to the information structure to make teammate modeling both necessary and fragile:
 
-| Setting | Q1 (baseline) | Q3 (hardened) | Rationale |
+| Setting | Q1 (baseline) | Q3_hardened | Rationale |
 |---------|:---:|:---:|-----------|
 | sight | 8 (full grid) | 3 (partial) | Forces reliance on type inference over direct observation |
 | observe_agent_levels | true | false | Makes teammate type genuinely latent — must infer from behavior |
@@ -121,7 +121,7 @@ With observe_agent_levels=false, LBF drops the level feature entirely from agent
 
 The model architecture (hidden_dim, type_dim, n_gnn_layers, etc.) and training hyperparameters remain identical to Q1. We test the *same algorithm* under harder conditions, not a different algorithm.
 
-Config: `configs/gpl_lbf_hardened.yaml`
+Config: `configs/gpl_lbf_q3_hardened.yaml`
 
 ### 3.6 Q4 — Hardened + Drift
 
@@ -294,7 +294,7 @@ HPC: SLURM cluster with RTX 6000B GPUs for training, any GPU for eval. Conda env
 | Drift eval | `experiments/eval_drift.py` | Q2/Q4/Q4-inf sweep evaluation |
 | Confound analysis | `experiments/analyze_capability_confound.py` | Capability confound decomposition |
 | Baseline config | `configs/gpl_lbf.yaml` | Q1/Q2 settings |
-| Hardened config | `configs/gpl_lbf_hardened.yaml` | Q3/Q4 settings |
+| Hardened config | `configs/gpl_lbf_q3_hardened.yaml` | Q3_hardened / Q4_hardened settings |
 | Inference config | `configs/gpl_lbf_q3_inf.yaml` | Q3-inf/Q4-inf settings |
 | Sweep grid | `configs/drift_sweep.yaml` | 10 sigma x 5 theta eval grid |
 

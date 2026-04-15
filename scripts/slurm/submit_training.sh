@@ -26,7 +26,7 @@ echo "Using conda env: ${MQP_CONDA_ENV}"
 echo "Submitting Q1 (baseline training)..."
 sbatch --export=ALL scripts/slurm/q1_train.slurm
 
-echo "Submitting Q3 (hardened training)..."
-sbatch --export=ALL scripts/slurm/q3_train.slurm
+echo "Submitting Q3_hardened training..."
+sbatch --export=ALL scripts/slurm/q3_hardened_train.slurm
 
 echo "Done. squeue -u \$USER"

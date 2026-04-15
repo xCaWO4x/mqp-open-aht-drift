@@ -1,7 +1,7 @@
 #!/bin/bash
 # Q4-inf: Drift eval on Q3-inf checkpoint (no retraining needed)
 # Config: configs/gpl_lbf_q3_inf.yaml + configs/drift_sweep.yaml
-# Results: results/q4_inf_hardened_drift/
+# Results: results/q4_inf_rw_drift/
 #SBATCH --job-name=q4-inf-drift
 #SBATCH --account=xliu14
 #SBATCH --partition=short
@@ -27,10 +27,10 @@ conda activate "${MQP_CONDA_ENV:-drift-aht}"
 
 export PYTHONUNBUFFERED=1
 
-CHECKPOINT="${DRIFT_CHECKPOINT:-results/q3_inf_hardened_stationary/checkpoints/gpl_final.pt}"
-RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/q4_inf_hardened_drift}"
+CHECKPOINT="${DRIFT_CHECKPOINT:-results/q3_inf_rw_stationary/checkpoints/gpl_final.pt}"
+RESULTS_DIR="${DRIFT_RESULTS_DIR:-results/q4_inf_rw_drift}"
 
-echo "Q4-inf: Drift eval on hardened + inference checkpoint"
+echo "Q4-inf: Drift eval on Q3_rw + inference checkpoint"
 echo "Checkpoint: ${CHECKPOINT}"
 echo "Results dir: ${RESULTS_DIR}"
 nvidia-smi

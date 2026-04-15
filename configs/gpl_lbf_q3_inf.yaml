@@ -1,7 +1,8 @@
-# Q3-inf — Hardened GPL with auxiliary inference head + EMA belief tracker
+# Q3-inf — Info-nerf-only GPL + auxiliary inference head + EMA belief tracker
 #
-# Same hardened nerfs as Q3 (partial obs, latent types, 4 agents, force coop)
-# but with two additions to recover teammate structure:
+# Same task structure as Q1 / Q3_rw: 3 agents, no forced coop, but with
+# information nerfs only (sight=3, observe_agent_levels=false).
+# Adds:
 #
 #   1. Auxiliary level prediction head: cross-entropy on privileged teammate
 #      level labels during training (CTDE). Forces type embeddings to encode
@@ -11,18 +12,17 @@
 #      concatenated to observation input. Provides population-level context
 #      so the policy can detect composition trends.
 #
-# Compare Q3-inf vs Q3 to measure how much the auxiliary inference recovers.
-# Q4-inf (drift eval) uses this checkpoint without retraining.
+# Compare Q3-inf vs Q3_rw to measure how much auxiliary inference recovers.
 
-# --- Environment (same as Q3) ---
+# --- Environment (same as Q3_rw / Q1 structure + info nerfs) ---
 env:
-  id: "Foraging-8x8-4p-3f-v3"
+  id: "Foraging-8x8-3p-3f-v3"
   backend: "gymnasium"
   grid_size: 8
-  n_agents: 4
+  n_agents: 3
   n_food: 3
   max_steps: 50
-  force_coop: true
+  force_coop: false
   sight: 3
   observe_agent_levels: false
 
@@ -117,10 +117,10 @@ drift_eval:
 # --- Logging ---
 logging:
   wandb_project: "open-aht-drift"
-  wandb_group: "q3-inf-hardened"
+  wandb_group: "q3-inf-rw"
   tensorboard: true
-  log_dir: "runs/q3_inf_hardened_stationary"
-  results_dir: "results/q3_inf_hardened_stationary"
+  log_dir: "runs/q3_inf_rw_stationary"
+  results_dir: "results/q3_inf_rw_stationary"
 
 # --- Reproducibility ---
 seed: 42

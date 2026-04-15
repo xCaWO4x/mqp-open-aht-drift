@@ -59,15 +59,15 @@ open-aht-drift/
 │   └── analyze_capability_confound.py  # Capability vs drift decomposition
 ├── configs/
 │   ├── gpl_lbf.yaml            # Q1/Q2 baseline config (Rahman paper)
-│   ├── gpl_lbf_hardened.yaml   # Q3/Q4 hardened config (partial obs, 4p, force coop)
+│   ├── gpl_lbf_q3_hardened.yaml   # Q3_hardened / Q4_hardened (partial obs, 4p, force coop)
 │   ├── drift_sweep.yaml        # (σ, θ) grid for Q2/Q4
 │   └── gpl_wolfpack.yaml       # Future: Wolfpack
 ├── scripts/slurm/
 │   ├── q1_train.slurm          # Q1 baseline training
 │   ├── q2_drift_eval.slurm     # Q2 baseline + drift
-│   ├── q3_train.slurm          # Q3 hardened training
-│   ├── q4_drift_eval.slurm     # Q4 hardened + drift
-│   ├── submit_training.sh      # Submit Q1 + Q3
+│   ├── q3_hardened_train.slurm # Q3_hardened training
+│   ├── q4_drift_eval.slurm     # Q4_hardened + drift
+│   ├── submit_training.sh      # Submit Q1 + Q3_hardened
 │   └── submit_drift_eval.sh    # Submit Q2 + Q4
 ├── tests/
 │   ├── test_ou_process.py      # 11 tests

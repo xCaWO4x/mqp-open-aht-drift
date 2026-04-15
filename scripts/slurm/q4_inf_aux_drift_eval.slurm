@@ -1,7 +1,7 @@
 #!/bin/bash
 # Q4-inf-aux: Drift eval on Q3-inf-aux checkpoint (aux head only, no EMA)
 # Config: configs/gpl_lbf_q3_inf_aux.yaml + configs/drift_sweep.yaml
-# Results: results/q4_inf_aux_hardened_drift/
+# Results: results/q4_inf_aux_rw_drift/
 #SBATCH --job-name=q4-inf-aux
 #SBATCH --account=xliu14
 #SBATCH --partition=short
@@ -27,8 +27,8 @@ conda activate "${MQP_CONDA_ENV:-drift-aht}"
 
 export PYTHONUNBUFFERED=1
 
-CHECKPOINT="results/q3_inf_aux_stationary/checkpoints/gpl_final.pt"
-RESULTS_DIR="results/q4_inf_aux_hardened_drift"
+CHECKPOINT="results/q3_inf_aux_rw_stationary/checkpoints/gpl_final.pt"
+RESULTS_DIR="results/q4_inf_aux_rw_drift"
 
 echo "Q4-inf-aux: Drift eval on aux-only checkpoint"
 echo "Checkpoint: ${CHECKPOINT}"
