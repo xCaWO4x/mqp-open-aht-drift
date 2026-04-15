@@ -37,6 +37,7 @@ import torch
 from lbforaging.foraging.environment import ForagingEnv
 
 from agents.gpl.gpl_agent import GPLAgent
+from agents.gpl.gpl_agent_inf import GPLAgentInf
 from drift.ou_process import OUProcess
 from envs.drift_wrapper import DriftWrapper
 from envs.env_utils import preprocess_lbf
@@ -128,6 +129,9 @@ def evaluate_drift_point(
         food_mode=food_mode, food_level_probs=food_probs, seed=seed,
     )
 
+    # Detect inference variant
+    is_inf = isinstance(agent, GPLAgentInf)
+
     # Per-episode records
     ep_returns = []
     ep_lengths = []
@@ -161,10 +165,15 @@ def evaluate_drift_point(
                 observe_agent_levels=observe_agent_levels,
             )
             B_np = B.cpu().numpy()
-            # Greedy action (no exploration)
-            action = agent.act(B_np, learner_idx=0, epsilon=0.0)
-            # Advance hidden states (act() no longer updates them)
-            agent.advance_hidden(B_np)
+
+            if is_inf:
+                # Use inference-augmented methods (EMA context)
+                action = agent.act_inf(B_np, learner_idx=0, epsilon=0.0)
+                agent.advance_hidden_inf(B_np)
+            else:
+                # Standard GPL methods
+                action = agent.act(B_np, learner_idx=0, epsilon=0.0)
+                agent.advance_hidden(B_np)
 
             # Joint action: learner at 0, teammates random
             joint_action = [rng.integers(0, action_dim) for _ in range(n_agents)]
@@ -191,6 +200,10 @@ def evaluate_drift_point(
 
             ep_len += 1
             obs = next_obs
+
+        # Finalize EMA update at episode end (inference variant only)
+        if is_inf:
+            agent.end_episode_ema()
 
         ep_returns.append(ep_return)
         ep_lengths.append(ep_len)
@@ -619,10 +632,11 @@ def main():
         cfg["food"]["mode"] = args.food_mode
         print(f"Food mode overridden to: {args.food_mode}")
 
-    # Build and load agent
+    # Build and load agent — use GPLAgentInf if config has inference block
     model_cfg = cfg["model"]
-    agent = GPLAgent(
-        obs_dim=cfg["preprocess"]["obs_dim"],
+    inf_cfg = cfg.get("inference", None)
+
+    common_kwargs = dict(
         action_dim=model_cfg["action_dim"],
         type_dim=model_cfg["type_dim"],
         hidden_dim=model_cfg["hidden_dim"],
@@ -636,6 +650,23 @@ def main():
         polyak_tau=cfg["training"].get("polyak_tau", None),
         device=device,
     )
+
+    if inf_cfg is not None:
+        agent = GPLAgentInf(
+            obs_dim=cfg["preprocess"]["obs_dim"],
+            ema_dim=inf_cfg.get("ema_dim", 0),
+            aux_n_classes=inf_cfg.get("aux_n_classes", 3),
+            aux_weight=inf_cfg.get("aux_weight", 0.1),
+            ema_alpha=inf_cfg.get("ema_alpha", 0.1),
+            **common_kwargs,
+        )
+        print(f"Using GPLAgentInf (ema_dim={inf_cfg.get('ema_dim', 0)})")
+    else:
+        agent = GPLAgent(
+            obs_dim=cfg["preprocess"]["obs_dim"],
+            **common_kwargs,
+        )
+
     agent.load(args.checkpoint)
     print(f"Loaded checkpoint: {args.checkpoint}")
 
