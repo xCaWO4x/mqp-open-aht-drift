@@ -154,6 +154,7 @@ def evaluate(
     hidden_dim: int = 100,
     device: str = "cpu",
     action_dim: int = 6,
+    observe_agent_levels: bool = True,
 ) -> dict:
     """Evaluate agent for n_episodes under stationary composition, no training."""
     returns = []
@@ -386,6 +387,7 @@ def train(cfg: dict, smoke_test: bool = False):
             B_next, _, _ = preprocess_lbf(
                 next_obs, n_agents, n_food,
                 hidden_dim=hidden_dim, device=device,
+                observe_agent_levels=observe_agent_levels,
             )
             B_next_np = B_next.cpu().numpy()
 
@@ -450,7 +452,7 @@ def train(cfg: dict, smoke_test: bool = False):
                     eval_result = evaluate(
                         agent, eval_env, eval_cfg.get("eval_episodes", 5),
                         n_agents, n_food, K, rng, food_probs, hidden_dim, device,
-                        action_dim,
+                        action_dim, observe_agent_levels,
                     )
                     agent._hidden_q, agent._hidden_agent, agent._hidden_q_target = saved_hidden
 
