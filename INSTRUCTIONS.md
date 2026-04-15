@@ -17,25 +17,29 @@ The learner (agent 0) uses GPL; all teammates act randomly (standard open AHT pr
 
 ---
 
-## Experiment layout: 4 quadrants
+## Experiment layout: 4 quadrants + inference variant
 
 |  | Stationary (no drift) | Drift |
 |---|---|---|
-| **Baseline** (Rahman paper config) | **Q1** — `results/q1_baseline_stationary/` | **Q2** — `results/q2_baseline_drift/` |
-| **Hardened** (partial obs, latent types, 4p, force coop) | **Q3** — `results/q3_hardened_stationary/` | **Q4** — `results/q4_hardened_drift/` |
+| **Baseline** (Rahman paper config) | **Q1** | **Q2** |
+| **Hardened** (partial obs, latent types, 4p, force coop) | **Q3** | **Q4** |
+| **Hardened + inference** (aux head + EMA) | **Q3-inf** | **Q4-inf** |
 
 - **Q1/Q2** use `configs/gpl_lbf.yaml` (full obs, 3 agents, no force coop)
 - **Q3/Q4** use `configs/gpl_lbf_hardened.yaml` (sight=3, no agent levels, 4 agents, force coop)
-- **Q2/Q4** use `configs/drift_sweep.yaml` (10σ × 5θ extended grid)
+- **Q3-inf/Q4-inf** use `configs/gpl_lbf_q3_inf.yaml` (same hardened nerfs + auxiliary level prediction + EMA belief tracker)
+- **Q2/Q4/Q4-inf** use `configs/drift_sweep.yaml` (10σ × 5θ extended grid)
 
 ### What to do now
 
 ```bash
-# Step 1: submit Q1 + Q3 training (parallel)
+# Step 1: submit Q1 + Q3 + Q3-inf training (parallel)
 bash scripts/slurm/submit_training.sh
+sbatch scripts/slurm/q3_inf_train.slurm
 
-# Step 2: after both finish, submit Q2 + Q4 drift eval
+# Step 2: after training completes, submit drift evals
 bash scripts/slurm/submit_drift_eval.sh
+sbatch scripts/slurm/q4_inf_drift_eval.slurm
 ```
 
 See `docs/experiment_artifacts.md` for full artifact map.
@@ -58,6 +62,8 @@ See `docs/experiment_artifacts.md` for full artifact map.
 open-aht-drift-clean/
   agents/gpl/
     gpl_agent.py          # Top-level GPL agent (Algorithm 5, Polyak soft update, advance_hidden)
+    gpl_agent_inf.py      # GPL + auxiliary inference head + EMA (Q3-inf/Q4-inf)
+    auxiliary_head.py     # Auxiliary level prediction MLP
     type_inference.py      # LSTM type inference
     agent_model.py         # GNN agent model
     joint_action_value.py  # CG Q-network
@@ -66,10 +72,12 @@ open-aht-drift-clean/
   configs/
     gpl_lbf.yaml           # Q1/Q2 baseline config
     gpl_lbf_hardened.yaml   # Q3/Q4 hardened config
+    gpl_lbf_q3_inf.yaml    # Q3-inf/Q4-inf hardened + inference config
     drift_sweep.yaml        # Drift eval grid (10σ × 5θ)
     gpl_wolfpack.yaml       # Future
   drift/
     ou_process.py           # OU process on K-simplex with Euclidean projection
+    ema_tracker.py          # EMA belief tracker (population context)
   envs/
     drift_wrapper.py        # Gym wrapper: advances OU, samples composition
     env_utils.py            # PREPROCESS: LBF obs parsing (FOOD FIRST), supports observe_agent_levels
@@ -77,13 +85,16 @@ open-aht-drift-clean/
     logger.py               # TensorBoard + optional wandb
   experiments/
     train_gpl.py            # Training loop (16 parallel envs)
+    train_gpl_inf.py        # Training loop with aux head + EMA (Q3-inf)
     eval_drift.py           # Drift eval (single point + sweep)
     analyze_capability_confound.py  # Capability-confound analysis
   scripts/slurm/
     q1_train.slurm          # Q1 baseline training
     q2_drift_eval.slurm     # Q2 baseline drift eval
     q3_train.slurm          # Q3 hardened training
+    q3_inf_train.slurm      # Q3-inf hardened + inference training
     q4_drift_eval.slurm     # Q4 hardened drift eval
+    q4_inf_drift_eval.slurm # Q4-inf hardened + inference drift eval
     submit_training.sh      # Submit Q1 + Q3
     submit_drift_eval.sh    # Submit Q2 + Q4
   tests/
