@@ -160,7 +160,7 @@ class GPLAgentInf(GPLAgent):
         if teammate_indices is None:
             teammate_indices = [j for j in range(N) if j != learner_idx]
 
-        if len(teammate_indices) > 0:
+        if len(teammate_indices) > 0 and self.aux_weight > 0:
             tm_emb = type_emb[teammate_indices]
             tm_levels = levels_tensor[teammate_indices]
             aux_loss = self.aux_head.loss(tm_emb, tm_levels) * self.aux_weight

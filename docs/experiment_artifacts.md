@@ -6,7 +6,9 @@ All results live under `results/` (gitignored). Core quadrants + inference varia
 |---|---|---|
 | **Baseline** (Rahman paper config) | **Q1** | **Q2** |
 | **Hardened** (partial obs, latent types, 4p, force coop) | **Q3** | **Q4** |
-| **Hardened + inference** (aux head + EMA tracker) | **Q3-inf** | **Q4-inf** |
+| **Hardened + aux head only** | **Q3-inf-aux** | **Q4-inf-aux** |
+| **Hardened + EMA only** | **Q3-inf-ema** | **Q4-inf-ema** |
+| **Hardened + both** (aux head + EMA tracker) | **Q3-inf** | **Q4-inf** |
 
 ---
 
