@@ -1,8 +1,8 @@
 #!/bin/bash
-# Q3 greedy stationary evaluation (500 episodes, epsilon=0 via eval_drift single-point mode)
-# Uses Q3 stationary checkpoint and evaluates at sigma=0 (no drift).
+# Q3_hardened greedy stationary evaluation (500 episodes, epsilon=0 via eval_drift single-point mode)
+# Uses Q3_hardened stationary checkpoint and evaluates at sigma=0 (no drift).
 # Results: results/q3_hardened_stationary_greedy_eval_500/
-#SBATCH --job-name=q3-greedy-eval
+#SBATCH --job-name=q3_hardened_greedy_eval
 #SBATCH --account=xliu14
 #SBATCH --partition=short
 #SBATCH --nodes=1
@@ -37,7 +37,7 @@ nvidia-smi
 
 python -u experiments/eval_drift.py \
     --checkpoint "${CHECKPOINT}" \
-    --config configs/gpl_lbf_hardened.yaml \
+    --config configs/gpl_lbf_q3_hardened.yaml \
     --sigma 0.0 \
     --theta 0.15 \
     --n-episodes 500 \

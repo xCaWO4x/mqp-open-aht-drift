@@ -22,18 +22,18 @@ The learner (agent 0) uses GPL; all teammates act randomly (standard open AHT pr
 |  | Stationary (no drift) | Drift |
 |---|---|---|
 | **Baseline** (Rahman paper config) | **Q1** | **Q2** |
-| **Hardened** (partial obs, latent types, 4p, force coop) | **Q3** | **Q4** |
+| **Hardened** (partial obs, latent types, 4p, force coop) | **Q3_hardened** | **Q4_hardened** |
 | **Hardened + inference** (aux head + EMA) | **Q3-inf** | **Q4-inf** |
 
 - **Q1/Q2** use `configs/gpl_lbf.yaml` (full obs, 3 agents, no force coop)
-- **Q3/Q4** use `configs/gpl_lbf_hardened.yaml` (sight=3, no agent levels, 4 agents, force coop)
+- **Q3_hardened/Q4_hardened** use `configs/gpl_lbf_q3_hardened.yaml` (sight=3, no agent levels, 4 agents, force coop)
 - **Q3-inf/Q4-inf** use `configs/gpl_lbf_q3_inf.yaml` (same hardened nerfs + auxiliary level prediction + EMA belief tracker)
 - **Q2/Q4/Q4-inf** use `configs/drift_sweep.yaml` (10σ × 5θ extended grid)
 
 ### What to do now
 
 ```bash
-# Step 1: submit Q1 + Q3 + Q3-inf training (parallel)
+# Step 1: submit Q1 + Q3_hardened + Q3-inf training (parallel)
 bash scripts/slurm/submit_training.sh
 sbatch scripts/slurm/q3_inf_train.slurm
 
@@ -71,7 +71,7 @@ open-aht-drift-clean/
     random_agent.py
   configs/
     gpl_lbf.yaml           # Q1/Q2 baseline config
-    gpl_lbf_hardened.yaml   # Q3/Q4 hardened config
+    gpl_lbf_q3_hardened.yaml   # Q3_hardened / Q4_hardened config
     gpl_lbf_q3_inf.yaml    # Q3-inf/Q4-inf hardened + inference config
     drift_sweep.yaml        # Drift eval grid (10σ × 5θ)
     gpl_wolfpack.yaml       # Future
@@ -91,11 +91,11 @@ open-aht-drift-clean/
   scripts/slurm/
     q1_train.slurm          # Q1 baseline training
     q2_drift_eval.slurm     # Q2 baseline drift eval
-    q3_train.slurm          # Q3 hardened training
+    q3_hardened_train.slurm # Q3_hardened training
     q3_inf_train.slurm      # Q3-inf hardened + inference training
-    q4_drift_eval.slurm     # Q4 hardened drift eval
+    q4_drift_eval.slurm     # Q4_hardened drift eval (job: q4_hardened_drift)
     q4_inf_drift_eval.slurm # Q4-inf hardened + inference drift eval
-    submit_training.sh      # Submit Q1 + Q3
+    submit_training.sh      # Submit Q1 + Q3_hardened
     submit_drift_eval.sh    # Submit Q2 + Q4
   tests/
     test_gpl_forward.py     # 37 tests

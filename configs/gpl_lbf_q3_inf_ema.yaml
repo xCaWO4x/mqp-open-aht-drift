@@ -1,23 +1,22 @@
-# Q3-inf-ema — Hardened GPL with EMA belief tracker ONLY (no aux head)
+# Q3-inf-ema — Info-nerf-only GPL with EMA belief tracker ONLY (no aux head)
 #
 # Ablation: tests whether cross-episode population context (EMA of type
 # embeddings) improves performance, WITHOUT forcing the type embeddings
 # to encode level structure. Isolates the contribution of the EMA tracker.
 #
 # Compare:
-#   Q3-inf-ema vs Q3       → does EMA alone help?
+#   Q3-inf-ema vs Q3_rw    → does EMA alone help?
 #   Q3-inf-ema vs Q3-inf   → how much does aux head add on top of EMA?
-#   Q4-inf-ema vs Q4       → does EMA alone help under drift?
 
-# --- Environment (same as Q3) ---
+# --- Environment (same as Q3_rw / Q1 structure + info nerfs) ---
 env:
-  id: "Foraging-8x8-4p-3f-v3"
+  id: "Foraging-8x8-3p-3f-v3"
   backend: "gymnasium"
   grid_size: 8
-  n_agents: 4
+  n_agents: 3
   n_food: 3
   max_steps: 50
-  force_coop: true
+  force_coop: false
   sight: 3
   observe_agent_levels: false
 
@@ -111,10 +110,10 @@ drift_eval:
 # --- Logging ---
 logging:
   wandb_project: "open-aht-drift"
-  wandb_group: "q3-inf-ema"
+  wandb_group: "q3-inf-ema-rw"
   tensorboard: true
-  log_dir: "runs/q3_inf_ema_stationary"
-  results_dir: "results/q3_inf_ema_stationary"
+  log_dir: "runs/q3_inf_ema_rw_stationary"
+  results_dir: "results/q3_inf_ema_rw_stationary"
 
 # --- Reproducibility ---
 seed: 42

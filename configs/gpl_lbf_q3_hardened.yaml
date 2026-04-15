@@ -1,4 +1,6 @@
-# Q3 — Hardened GPL training for Level-Based Foraging
+# Q3_hardened — Hardened GPL training for Level-Based Foraging
+#
+# Config file: configs/gpl_lbf_q3_hardened.yaml
 #
 # "Nerfs" applied to the baseline (Q1) to expose drift-induced failures:
 #
@@ -20,8 +22,8 @@
 # Quadrant layout:
 #   Q1: baseline stationary  → results/q1_baseline_stationary/  (gpl_lbf.yaml)
 #   Q2: baseline + drift     → results/q2_baseline_drift/       (gpl_lbf.yaml)
-#   Q3: hardened stationary   → results/q3_hardened_stationary/
-#   Q4: hardened + drift      → results/q4_hardened_drift/
+#   Q3_hardened stationary   → results/q3_hardened_stationary/
+#   Q4_hardened + drift      → results/q4_hardened_drift/
 
 # --- Environment ---
 env:
@@ -123,7 +125,7 @@ drift_eval:
 # --- Logging ---
 logging:
   wandb_project: "open-aht-drift"
-  wandb_group: "q3-hardened"
+  wandb_group: "q3_hardened"
   tensorboard: true
   log_dir: "runs/q3_hardened_stationary"
   results_dir: "results/q3_hardened_stationary"

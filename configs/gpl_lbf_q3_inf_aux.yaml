@@ -1,23 +1,22 @@
-# Q3-inf-aux — Hardened GPL with auxiliary inference head ONLY (no EMA)
+# Q3-inf-aux — Info-nerf-only GPL with auxiliary inference head ONLY (no EMA)
 #
 # Ablation: tests whether forcing type embeddings to encode level structure
 # (via CTDE auxiliary loss) improves performance, WITHOUT any cross-episode
 # population context. Isolates the contribution of the auxiliary head.
 #
 # Compare:
-#   Q3-inf-aux vs Q3      → does aux head alone help?
-#   Q3-inf-aux vs Q3-inf   → how much does EMA add on top of aux head?
-#   Q4-inf-aux vs Q4       → does aux head alone help under drift?
+#   Q3-inf-aux vs Q3_rw   → does aux head alone help?
+#   Q3-inf-aux vs Q3-inf  → how much does EMA add on top of aux head?
 
-# --- Environment (same as Q3) ---
+# --- Environment (same as Q3_rw / Q1 structure + info nerfs) ---
 env:
-  id: "Foraging-8x8-4p-3f-v3"
+  id: "Foraging-8x8-3p-3f-v3"
   backend: "gymnasium"
   grid_size: 8
-  n_agents: 4
+  n_agents: 3
   n_food: 3
   max_steps: 50
-  force_coop: true
+  force_coop: false
   sight: 3
   observe_agent_levels: false
 
@@ -111,10 +110,10 @@ drift_eval:
 # --- Logging ---
 logging:
   wandb_project: "open-aht-drift"
-  wandb_group: "q3-inf-aux"
+  wandb_group: "q3-inf-aux-rw"
   tensorboard: true
-  log_dir: "runs/q3_inf_aux_stationary"
-  results_dir: "results/q3_inf_aux_stationary"
+  log_dir: "runs/q3_inf_aux_rw_stationary"
+  results_dir: "results/q3_inf_aux_rw_stationary"
 
 # --- Reproducibility ---
 seed: 42

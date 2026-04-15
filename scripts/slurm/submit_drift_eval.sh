@@ -1,5 +1,5 @@
 #!/bin/bash
-# Submit Q2 and Q4 drift eval jobs (requires Q1/Q3 checkpoints).
+# Submit Q2 and Q4_hardened drift eval jobs (requires Q1 / Q3_hardened checkpoints).
 # Usage: bash scripts/slurm/submit_drift_eval.sh
 
 set -euo pipefail
@@ -8,9 +8,9 @@ cd "$ROOT"
 mkdir -p logs/slurm
 
 echo "Submitting Q2 (baseline drift eval)..."
-sbatch scripts/slurm/q2_drift_eval.slurm
+sbatch --export=ALL scripts/slurm/q2_drift_eval.slurm
 
-echo "Submitting Q4 (hardened drift eval)..."
-sbatch scripts/slurm/q4_drift_eval.slurm
+echo "Submitting Q4_hardened drift eval..."
+sbatch --export=ALL scripts/slurm/q4_drift_eval.slurm
 
 echo "Done. squeue -u \$USER"

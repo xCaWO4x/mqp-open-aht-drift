@@ -1,7 +1,7 @@
 #!/bin/bash
-# Q3-inf: Train hardened GPL with auxiliary inference head + EMA belief tracker
+# Q3-inf: Train info-nerf-only (Q3_rw) GPL + auxiliary head + EMA belief tracker
 # Config: configs/gpl_lbf_q3_inf.yaml
-# Results: results/q3_inf_hardened_stationary/
+# Results: results/q3_inf_rw_stationary/
 #SBATCH --job-name=q3-inf-train
 #SBATCH --account=xliu14
 #SBATCH --partition=short
@@ -10,7 +10,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:1
-#SBATCH --constraint=rtx6000b
+#SBATCH --constraint=RTX6000B
 #SBATCH --time=1-00:00:00
 #SBATCH --output=logs/slurm/%x-%j.out
 #SBATCH --error=logs/slurm/%x-%j.err
@@ -28,7 +28,7 @@ conda activate "${MQP_CONDA_ENV:-drift-aht}"
 
 export PYTHONUNBUFFERED=1
 
-echo "Q3-inf: Hardened + auxiliary inference + EMA belief"
+echo "Q3-inf: Q3_rw env + auxiliary inference + EMA belief"
 nvidia-smi
 
 python -u experiments/train_gpl_inf.py \

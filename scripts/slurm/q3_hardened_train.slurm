@@ -1,8 +1,8 @@
 #!/bin/bash
-# Q3 — Hardened GPL training (partial obs, latent types, 4 agents, force coop)
-# Config: configs/gpl_lbf_hardened.yaml
+# Q3_hardened — Hardened GPL training (partial obs, latent types, 4 agents, force coop)
+# Config: configs/gpl_lbf_q3_hardened.yaml
 # Results: results/q3_hardened_stationary/
-#SBATCH --job-name=q3-train
+#SBATCH --job-name=q3_hardened_train
 #SBATCH --account=xliu14
 #SBATCH --partition=short
 #SBATCH --nodes=1
@@ -27,7 +27,7 @@ fi
 conda activate "${MQP_CONDA_ENV:-drift-aht}"
 
 export PYTHONUNBUFFERED=1
-echo "Q3: Hardened training (sight=3, no agent levels, 4 agents, force coop)"
+echo "Q3_hardened: training (sight=3, no agent levels, 4 agents, force coop)"
 nvidia-smi
 
-python -u experiments/train_gpl.py --config configs/gpl_lbf_hardened.yaml
+python -u experiments/train_gpl.py --config configs/gpl_lbf_q3_hardened.yaml
