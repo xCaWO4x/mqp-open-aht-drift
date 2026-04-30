@@ -686,7 +686,12 @@ class GPLAgent:
 
     def load(self, path: str):
         """Load model weights and optimiser state."""
-        ckpt = torch.load(path, map_location=self.device)
+        try:
+            ckpt = torch.load(
+                path, map_location=self.device, weights_only=False
+            )
+        except TypeError:
+            ckpt = torch.load(path, map_location=self.device)
         self.type_net_q.load_state_dict(ckpt["type_net_q"])
         self.type_net_agent.load_state_dict(ckpt["type_net_agent"])
         self.agent_model.load_state_dict(ckpt["agent_model"])

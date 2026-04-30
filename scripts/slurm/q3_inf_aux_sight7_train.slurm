@@ -1,8 +1,9 @@
 #!/bin/bash
-# Q3_hardened — Hardened GPL training (partial obs, latent types, 4 agents, force coop)
-# Config: configs/gpl_lbf_q3_hardened.yaml
-# Results: results/q3_hardened_stationary/
-#SBATCH --job-name=q3_hardened_train
+# Q3-inf-aux SIGHT SWEEP — sight = 4 training run
+# Identical protocol to q3_inf_aux_train.slurm; only the config differs.
+# Config:  configs/gpl_lbf_q3_inf_aux_sight7.yaml
+# Results: results/q3_inf_aux_sight7_rw_stationary/
+#SBATCH --job-name=q3-inf-aux-s7
 #SBATCH --account=xliu14
 #SBATCH --partition=short
 #SBATCH --nodes=1
@@ -27,7 +28,9 @@ fi
 conda activate "${MQP_CONDA_ENV:-drift-aht}"
 
 export PYTHONUNBUFFERED=1
-echo "Q3_hardened: training (sight=3, no agent levels, 4 agents, force coop)"
+
+echo "Q3-inf-aux sight sweep: sight=7"
 nvidia-smi
 
-python -u experiments/train_gpl.py --config configs/gpl_lbf_q3_hardened.yaml
+python -u experiments/train_gpl_inf.py \
+    --config configs/gpl_lbf_q3_inf_aux_sight7.yaml

@@ -44,8 +44,6 @@ open-aht-drift/
 │   │   ├── agent_model.py      # RFM teammate action prediction
 │   │   ├── joint_action_value.py  # Coordination graph Q-values
 │   │   └── gpl_agent.py        # Top-level agent (Algorithms 2–5)
-│   └── baselines/
-│       └── random_agent.py
 ├── drift/
 │   └── ou_process.py           # OU process over K-simplex
 ├── envs/
@@ -59,15 +57,14 @@ open-aht-drift/
 │   └── analyze_capability_confound.py  # Capability vs drift decomposition
 ├── configs/
 │   ├── gpl_lbf.yaml            # Q1/Q2 baseline config (Rahman paper)
-│   ├── gpl_lbf_q3_hardened.yaml   # Q3_hardened / Q4_hardened (partial obs, 4p, force coop)
-│   ├── drift_sweep.yaml        # (σ, θ) grid for Q2/Q4
-│   └── gpl_wolfpack.yaml       # Future: Wolfpack
+│   ├── gpl_lbf_q3_rw.yaml      # Q3_rw / Q4_rw info-nerf baseline (3p, no force coop)
+│   └── drift_sweep.yaml        # (σ, θ) grid for Q2/Q4
 ├── scripts/slurm/
 │   ├── q1_train.slurm          # Q1 baseline training
 │   ├── q2_drift_eval.slurm     # Q2 baseline + drift
-│   ├── q3_hardened_train.slurm # Q3_hardened training
-│   ├── q4_drift_eval.slurm     # Q4_hardened + drift
-│   ├── submit_training.sh      # Submit Q1 + Q3_hardened
+│   ├── q3_rw_train.slurm       # Q3_rw baseline training
+│   ├── q4_rw_drift_eval.slurm  # Q4_rw + drift
+│   ├── submit_training.sh      # Submit Q1 + Q3_rw
 │   └── submit_drift_eval.sh    # Submit Q2 + Q4
 ├── tests/
 │   ├── test_ou_process.py      # 11 tests
@@ -88,13 +85,13 @@ open-aht-drift/
 |  | Stationary | Drift |
 |--|-----------|-------|
 | **Baseline** (Rahman config) | Q1 | Q2 |
-| **Hardened** (partial obs, latent types, 4p, force coop) | Q3 | Q4 |
+| **RW baseline** (info nerf only, 3p, no force coop) | Q3_rw | Q4_rw |
 
 ```bash
-# Train Q1 + Q3
+# Train Q1 + Q3_rw
 bash scripts/slurm/submit_training.sh
 
-# After training: eval Q2 + Q4
+# After training: eval Q2 + Q4_rw
 bash scripts/slurm/submit_drift_eval.sh
 ```
 
