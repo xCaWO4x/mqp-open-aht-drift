@@ -1,8 +1,9 @@
 # Local dev notes
 CHANGELOG.md
 TODO.md
-docs/turing_usage.md
-docs/research_proposal.md
+
+# Docs (kept locally, not tracked)
+docs/
 
 # Python
 __pycache__/
