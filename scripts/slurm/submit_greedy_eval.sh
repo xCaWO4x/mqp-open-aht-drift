@@ -1,5 +1,6 @@
 #!/bin/bash
-# Submit stationary greedy eval jobs (Q1 + Q3_hardened).
+# Submit stationary greedy eval jobs (Q1 + all Q3 variants, no drift).
+# Same protocol as Q1: eval_drift.py single-point, sigma=0, 500 eps, seed 42.
 # Usage: bash scripts/slurm/submit_greedy_eval.sh
 
 set -euo pipefail
@@ -25,7 +26,16 @@ echo "Using conda env: ${MQP_CONDA_ENV}"
 echo "Submitting Q1 greedy eval (500 episodes)..."
 sbatch --export=ALL scripts/slurm/q1_greedy_eval.slurm
 
-echo "Submitting Q3_hardened greedy eval (500 episodes)..."
-sbatch --export=ALL scripts/slurm/q3_greedy_eval.slurm
+echo "Submitting Q3_rw greedy eval (500 episodes)..."
+sbatch --export=ALL scripts/slurm/q3_rw_greedy_eval.slurm
+
+echo "Submitting Q3-inf greedy eval (500 episodes)..."
+sbatch --export=ALL scripts/slurm/q3_inf_greedy_eval.slurm
+
+echo "Submitting Q3-inf-aux greedy eval (500 episodes)..."
+sbatch --export=ALL scripts/slurm/q3_inf_aux_greedy_eval.slurm
+
+echo "Submitting Q3-inf-ema greedy eval (500 episodes)..."
+sbatch --export=ALL scripts/slurm/q3_inf_ema_greedy_eval.slurm
 
 echo "Done. squeue -u \$USER"

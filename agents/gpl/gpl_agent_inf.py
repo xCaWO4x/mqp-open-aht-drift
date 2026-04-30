@@ -139,6 +139,15 @@ class GPLAgentInf(GPLAgent):
         B_t = self.augment_obs(B_t_raw)
         B_t_next = self.augment_obs(B_t_next_raw)
 
+        # Snapshot the pre-update hidden state so the aux-loss forward
+        # sees the same temporal context the policy itself uses. If we
+        # instead passed None (no hidden), the LSTM would see a single
+        # frame with no history — under observe_agent_levels=false the
+        # level label is NOT recoverable from a single frame, so the aux
+        # CE would stay pinned at uniform (ln K ≈ 1.10 for K=3) and the
+        # head never learns. This was the prior behavior.
+        hidden_agent_prev = self._hidden_agent
+
         # --- Standard GPL training step (parent) ---
         metrics = super().train_step_online(
             B_t, joint_actions, reward, B_t_next, done,
@@ -147,12 +156,10 @@ class GPLAgentInf(GPLAgent):
         )
 
         # --- Auxiliary loss: predict teammate levels from type embeddings ---
-        # Re-run type_net_agent with fresh hidden (no carry) to get embeddings
-        # for the auxiliary head. This is a separate forward pass that provides
-        # gradients to type_net_agent + aux_head without interfering with the
-        # main LSTM hidden state (which was already updated by train_step_online).
+        # Fresh forward (independent graph for aux backward) but with the
+        # pre-update carried hidden state — matches what the policy saw.
         B_t_tensor = torch.FloatTensor(B_t).to(self.device)
-        type_emb, _ = self.type_net_agent(B_t_tensor, None)
+        type_emb, _ = self.type_net_agent(B_t_tensor, hidden_agent_prev)
 
         levels_tensor = torch.LongTensor(agent_levels).to(self.device)
 
@@ -244,7 +251,12 @@ class GPLAgentInf(GPLAgent):
 
     def load(self, path: str):
         """Load model weights including aux head and EMA state."""
-        ckpt = torch.load(path, map_location=self.device)
+        try:
+            ckpt = torch.load(
+                path, map_location=self.device, weights_only=False
+            )
+        except TypeError:
+            ckpt = torch.load(path, map_location=self.device)
         self.type_net_q.load_state_dict(ckpt["type_net_q"])
         self.type_net_agent.load_state_dict(ckpt["type_net_agent"])
         self.agent_model.load_state_dict(ckpt["agent_model"])

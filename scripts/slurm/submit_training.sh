@@ -1,5 +1,5 @@
 #!/bin/bash
-# Submit Q1 and Q3 training jobs.
+# Submit Q1 and Q3_rw training jobs.
 # Usage: bash scripts/slurm/submit_training.sh
 
 set -euo pipefail
@@ -26,7 +26,7 @@ echo "Using conda env: ${MQP_CONDA_ENV}"
 echo "Submitting Q1 (baseline training)..."
 sbatch --export=ALL scripts/slurm/q1_train.slurm
 
-echo "Submitting Q3_hardened training..."
-sbatch --export=ALL scripts/slurm/q3_hardened_train.slurm
+echo "Submitting Q3_rw training..."
+sbatch --export=ALL scripts/slurm/q3_rw_train.slurm
 
 echo "Done. squeue -u \$USER"

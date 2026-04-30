@@ -1,8 +1,9 @@
 #!/bin/bash
-# Q3_hardened greedy stationary evaluation (500 episodes, epsilon=0 via eval_drift single-point mode)
-# Uses Q3_hardened stationary checkpoint and evaluates at sigma=0 (no drift).
-# Results: results/q3_hardened_stationary_greedy_eval_500/
-#SBATCH --job-name=q3_hardened_greedy_eval
+# Q4_rw naming, stationary greedy only (NOT drift sweep): same protocol as Q1 / q3_rw_greedy_eval.
+# Evaluates the Q3_rw-trained policy under sigma=0, 500 greedy episodes.
+# Checkpoint + config match Q3_rw; output dir uses q4_rw prefix for bookkeeping.
+# Results: results/q4_rw_stationary_greedy_eval_500/
+#SBATCH --job-name=q4-rw-greedy-eval
 #SBATCH --account=xliu14
 #SBATCH --partition=short
 #SBATCH --nodes=1
@@ -27,17 +28,17 @@ conda activate "${MQP_CONDA_ENV:-drift-aht}"
 
 export PYTHONUNBUFFERED=1
 
-CHECKPOINT="results/q3_hardened_stationary/checkpoints/gpl_final.pt"
-RESULTS_DIR="results/q3_hardened_stationary_greedy_eval_500"
+CHECKPOINT="results/q3_rw_stationary/checkpoints/gpl_final.pt"
+RESULTS_DIR="results/q4_rw_stationary_greedy_eval_500"
 
-echo "Q3 greedy stationary eval (500 episodes)"
+echo "Q4_rw (stationary greedy): Q3_rw policy, 500 episodes"
 echo "Checkpoint: ${CHECKPOINT}"
 echo "Results: ${RESULTS_DIR}"
 nvidia-smi
 
 python -u experiments/eval_drift.py \
     --checkpoint "${CHECKPOINT}" \
-    --config configs/gpl_lbf_q3_hardened.yaml \
+    --config configs/gpl_lbf_q3_rw.yaml \
     --sigma 0.0 \
     --theta 0.15 \
     --n-episodes 500 \

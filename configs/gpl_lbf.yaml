@@ -8,8 +8,8 @@
 # Quadrant layout:
 #   Q1: baseline stationary  → results/q1_baseline_stationary/
 #   Q2: baseline + drift     → results/q2_baseline_drift/
-#   Q3_hardened stationary    → results/q3_hardened_stationary/  (gpl_lbf_q3_hardened.yaml)
-#   Q4_hardened + drift       → results/q4_hardened_drift/       (gpl_lbf_q3_hardened.yaml)
+#   Q3_rw stationary          → results/q3_rw_stationary/         (gpl_lbf_q3_rw.yaml)
+#   Q4_rw + drift             → results/q4_rw_drift/              (gpl_lbf_q3_rw.yaml)
 
 # --- Environment ---
 env:

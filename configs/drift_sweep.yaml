@@ -1,5 +1,5 @@
 # Drift evaluation sweep grid
-# Used by Q2 (baseline + drift) and Q4_hardened (hardened + drift).
+# Used by Q2 (baseline + drift) and Q4_rw (rw baseline + drift).
 # The training config (--config) determines env/model; this file only sets the grid.
 #
 # sigma=0 row is the stationary baseline (no noise → composition stays uniform).
